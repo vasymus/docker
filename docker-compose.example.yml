@@ -9,7 +9,6 @@ services:
             args:
                 - DOCKER_LOCALHOST_SERVERNAME=${DOCKER_LOCALHOST_SERVERNAME}
         image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-nginx:0.1.0"
-        container_name: mpl-nginx
         deploy:
             replicas: 1
             restart_policy:
@@ -62,7 +61,6 @@ services:
             - MYSQL_PASSWORD=${DOCKER_MARIADB_PASSWORD}
             - MYSQL_ROOT_PASSWORD=root
             - TZ=UTC
-            - MYSQL_DATABASE=mpl
         ports:
             - "${DOCKER_MARIADB_PORT}:3306"
         networks:
