@@ -136,11 +136,7 @@ services:
 networks:
     mynetwork: ## !!!the name of network should be the same as ${DOCKER_NETWORK} !!!
         driver: "${DOCKER_NETWORK_DRIVER}"
-        ## custom name for network
-        ## if omit the name would be something like `mynetwork_mynetwork`
-        name: mynetwork
 
 volumes:
     db-data:
-        external: true
 
