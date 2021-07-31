@@ -1,4 +1,3 @@
-### EXAMPLE docker-compose.yml FILE ###
 version: '3.8'
 
 services:
@@ -61,8 +60,10 @@ services:
             - MYSQL_PASSWORD=${DOCKER_MARIADB_PASSWORD}
             - MYSQL_ROOT_PASSWORD=root
             - TZ=UTC
-        ports:
-            - "${DOCKER_MARIADB_PORT}:3306"
+        expose:
+            - "3306"
+#        ports:
+#            - "${DOCKER_MARIADB_PORT}:3306"
         networks:
             - "${DOCKER_NETWORK}"
 
@@ -74,8 +75,8 @@ services:
             replicas: 1
         volumes:
             - ./docker/redis/data/:/data
-        ports:
-            - "${DOCKER_REDIS_PORT}:6379"
+        expose:
+            - "6379"
         networks:
             - "${DOCKER_NETWORK}"
 
@@ -103,11 +104,11 @@ services:
             replicas: 1
         volumes:
             - ./docker/mailhog/maildir:/home/mailhog/maildir
-        environment:
-            - MH_STORAGE=maildir
-            - MH_MAILDIR_PATH=/home/mailhog/maildir/mails
-            # authentication: mpl:qwe123
-            #- MH_AUTH_FILE=/home/mailhog/maildir/auth.txt
+#        environment:
+#            - MH_STORAGE=maildir
+#            - MH_MAILDIR_PATH=/home/mailhog/maildir/mails
+             ## authentication: mpl:qwe123
+#            - MH_AUTH_FILE=/home/mailhog/maildir/auth.txt
         # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
         command: -invite-jim=1
         ports:
@@ -127,7 +128,7 @@ services:
             - ADMIN_USER=${DOCKER_REDIS_WEBUI_USERNAME}
             - ADMIN_PASS=${DOCKER_REDIS_WEBUI_PASSWORD}
             - REDIS_1_HOST=redis
-            - REDIS_1_PORT=${DOCKER_REDIS_WEBUI_CONNECT_PORT}
+            - REDIS_1_PORT=6379
         networks:
             - "${DOCKER_NETWORK}"
         ports:

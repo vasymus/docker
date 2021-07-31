@@ -6,7 +6,11 @@ COPY nginx.conf /etc/nginx/
 
 ARG DOCKER_LOCALHOST_SERVERNAME=localhost
 COPY ./sites/ /etc/nginx/sites-available/
+COPY ./includes/ /etc/nginx/includes/
 RUN sed -i "s/{{DOCKER_LOCALHOST_SERVERNAME}}/${DOCKER_LOCALHOST_SERVERNAME}/g" /etc/nginx/sites-available/default.conf
+RUN sed -i "s/{{DOCKER_LOCALHOST_SERVERNAME}}/${DOCKER_LOCALHOST_SERVERNAME}/g" /etc/nginx/sites-available/adminer.conf
+RUN sed -i "s/{{DOCKER_LOCALHOST_SERVERNAME}}/${DOCKER_LOCALHOST_SERVERNAME}/g" /etc/nginx/sites-available/redis.conf
+RUN sed -i "s/{{DOCKER_LOCALHOST_SERVERNAME}}/${DOCKER_LOCALHOST_SERVERNAME}/g" /etc/nginx/sites-available/mailhog.conf
 
 RUN apk update \
     && apk upgrade \
