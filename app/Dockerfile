@@ -1,4 +1,4 @@
-FROM php:7.4.16-fpm-alpine3.13
+FROM php:7.2.24-alpine3.10
 
 RUN apk --update add --no-cache wget \
     curl \
