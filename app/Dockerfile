@@ -76,6 +76,9 @@ RUN docker-php-ext-install bcmath
 # pcntl
 RUN docker-php-ext-install pcntl
 
+#xdebug
+RUN pecl install xdebug && docker-php-ext-enable xdebug
+
 
 WORKDIR /etc
 
