@@ -1,4 +1,3 @@
-### EXAMPLE docker-compose.yml FILE ###
 version: '3.8'
 
 services:
@@ -15,6 +14,24 @@ services:
         networks:
             - "mynetwork"
 
+    ### DB (MariaDB) ##############################################
+    db:
+        build:
+            context: ./docker/mariadb
+        volumes:
+            - db-data:/var/lib/mysql
+            - ./docker/mariadb/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+        environment:
+            - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+            - MYSQL_DATABASE=my_models
+        ports:
+            - "3306:3306"
+        networks:
+            - "mynetwork"
+
 networks:
     mynetwork:
         driver: "bridge"
+
+volumes:
+    db-data:
