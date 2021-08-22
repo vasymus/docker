@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
     libpng16-16 \
     libpng-dev
 
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN docker-php-ext-configure gd \
     && docker-php-ext-install -j$(nproc) gd \
     && docker-php-ext-enable gd \
     && rm -rf /tmp/*
