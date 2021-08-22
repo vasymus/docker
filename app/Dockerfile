@@ -80,6 +80,9 @@ RUN docker-php-ext-install bcmath
 # pcntl
 RUN docker-php-ext-install pcntl
 
+# mysqli
+RUN docker-php-ext-install mysqli
+
 WORKDIR /etc
 
 COPY supervisord.conf /etc/supervisord.conf
