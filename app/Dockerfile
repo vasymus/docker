@@ -1,4 +1,4 @@
-FROM php:7.4.22-fpm
+FROM php:7.2.34-fpm
 
 # make sure apt is up to date
 RUN apt-get update --fix-missing
