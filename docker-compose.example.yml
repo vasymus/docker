@@ -17,7 +17,8 @@ services:
             - ./docker/nginx/logs/:/var/log/nginx
             #- ./docker/nginx/sites/:/etc/nginx/sites-available
             - ./docker/nginx/ssl/:/etc/nginx/ssl
-            - .:/var/www/html
+            # used delegated mode here on docker for mac for faster disk I/O
+            - .:/var/www/html:delegated
         ports:
             - "${DOCKER_NGINX_HOST_HTTP_PORT}:80"
             - "${DOCKER_NGINX_HOST_HTTPS_PORT}:443"
@@ -36,6 +37,7 @@ services:
         volumes:
             - ./docker/app/php.ini:/usr/local/etc/php/php.ini
             - ./docker/app/supervisor-logs:/var/log
+            # used delegated mode here on docker for mac for faster disk I/O
             - .:/var/www/html:delegated
         expose:
             - "9000"
