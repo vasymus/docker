@@ -96,10 +96,13 @@ WORKDIR /etc
 
 COPY supervisord.conf /etc/supervisord.conf
 
+RUN apt-get update && apt-get install -y procps
+
 # Clean up
 RUN apt-get remove -y git && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-WORKDIR /var/www/html
+ARG APP_DIR="/var/www/html"
+WORKDIR $APP_DIR
 
 #RUN mkdir /var/www/html/bootstrap
 #RUN mkdir /var/www/html/bootstrap/cache
