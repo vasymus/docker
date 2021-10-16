@@ -1,4 +1,36 @@
-FROM php:8.0.11-fpm
+# Multistage dockerfile
+# always pin the version
+FROM php:8.0.11-fpm as base
+
+ENV NGINX_VERSION=1.20.1 \
+    PKG_RELEASE=1~buster \
+    NJS_VERSION=0.5.3 \
+    NODE_VERSION=14.18.1
+
+RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
+    wget \
+    curl \
+    bash \
+    supervisor \
+    npm \
+    git \
+    yarn
+
+
+
+
+FROM base as dev
+## TODO think of adding yarn
+
+
+# install https://github.com/mlocati/docker-php-extension-installer for more convenient installation of php extension
+# this docker image (mlocati/docker-php-extension-installer) is recommended by official php docker repo
+# @see https://github.com/docker-library/docs/blob/master/php/README.md#php-core-extensions
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+
+
+RUN chmod +x /usr/local/bin/install-php-extensions && \
+    install-php-extensions gd xdebug
 
 # make sure apt is up to date
 RUN apt-get update --fix-missing
@@ -62,6 +94,9 @@ RUN pecl install redis \
 RUN docker-php-ext-install sockets
 
 # zip
+# alternative to install specific version -- didn't found a way to install specific version using docker-php-ext-install
+# pecl install Zip-1.20.0
+# apt-get update && apt-get install libzip-dev=1.5*
 RUN apt-get update && apt-get install -y \
     libzip-dev \
     && docker-php-ext-configure zip \
