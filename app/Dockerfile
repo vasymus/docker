@@ -1,4 +1,4 @@
-FROM php:8.0.12-fpm-buster
+FROM php:8.0.12-fpm-buster as base
 
 ### BASE PART of image ###
 ENV NGINX_VERSION=1.20.1 \
@@ -136,6 +136,21 @@ RUN set -ex \
     && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
     # smoke test
     && yarn --version
+
+ENV PATH /var/www/node_modules/.bin:$PATH
+
+### / BASE PART of image ###
+
+# add bitbucket and github to known hosts for ssh needs
+WORKDIR /root/.ssh
+RUN chmod 0600 /root/.ssh \
+    && ssh-keyscan -t rsa bitbucket.org >> known_hosts \
+    && ssh-keyscan -t rsa github.com >> known_hosts \
+    && ssh-keyscan -t rsa gitlab.com/ >> known_hosts
+
+
+
+# TODO continue from https://github.com/BretFisher/php-docker-good-defaults/blob/master/Dockerfile
 
 
 
