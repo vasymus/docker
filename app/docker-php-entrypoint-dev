@@ -1,0 +1,16 @@
+#!/bin/sh
+# todo think if we need `-e` option: 'Exit immediately if a command exits with a non-zero status.'
+# set -e
+
+# run last minute build tools just for local dev
+# this file should just be used to override on local dev in a compose file
+
+export set appFolders="/var/www/html/bootstrap/cache/ /var/www/html/public/ /var/www/html/storage/"
+# ensure bind mount permissions are what we need
+chown -R :www-data "$appFolders"
+chmod -R g+w "$appFolders"
+
+# run last minute build tools just for local dev
+composer dump-autoload -o
+
+exec "$@"

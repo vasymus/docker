@@ -1,6 +1,0 @@
-#!/bin/sh
-set -e
-
-# put here any production bash scripts if need
-
-exec "$@"

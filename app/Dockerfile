@@ -1,6 +1,8 @@
-FROM php:8.0.12-fpm-buster as base
+FROM php:8.0.12-fpm-buster as prepare
 
-### BASE PART of image ###
+### PREPARATION PART of image ###
+# should make any changes to it as less as possible
+# only if need to install some liberty or php extension
 ENV NGINX_VERSION=1.20.1 \
     NJS_VERSION=0.5.3 \
     PKG_RELEASE=1~buster
@@ -12,6 +14,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     supervisor \
     git \
     dos2unix \
+    openssh-client \
     # need for nginx
     gnupg1 \
     ca-certificates \
@@ -68,10 +71,9 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
             exif \
             bcmath \
             pcntl \
-            xdebug \
             gmagick \
             imagick
-# install composer from official image
+# install composer from official image @see https://hub.docker.com/_/composer
 COPY --from=composer:2.1.9 /usr/bin/composer /usr/bin/composer
 
 ## install node and yarn: copied from official node docker image
@@ -117,42 +119,46 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
     && node --version \
     && npm --version
 
-ENV YARN_VERSION 1.22.15
+# TODO think need of yarn
+#ENV YARN_VERSION 1.22.15
+#
+#RUN set -ex \
+#    && for key in \
+#        6A010C5166006599AA17F08146C2130DFD2497F5 \
+#    ; do \
+#        gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" || \
+#        gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" ; \
+#    done \
+#    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
+#    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc" \
+#    && gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
+#    && mkdir -p /opt \
+#    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/ \
+#    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarn /usr/local/bin/yarn \
+#    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg \
+#    && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
+#    # smoke test
+#    && yarn --version
 
-RUN set -ex \
-    && for key in \
-        6A010C5166006599AA17F08146C2130DFD2497F5 \
-    ; do \
-        gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" || \
-        gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" ; \
-    done \
-    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
-    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc" \
-    && gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
-    && mkdir -p /opt \
-    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/ \
-    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarn /usr/local/bin/yarn \
-    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg \
-    && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
-    # smoke test
-    && yarn --version
-
-ENV PATH /var/www/node_modules/.bin:$PATH
-
-### / BASE PART of image ###
-
-# add bitbucket and github to known hosts for ssh needs
+# add bitbucket, github and gitlab to known hosts for ssh needs
 WORKDIR /root/.ssh
 RUN chmod 0600 /root/.ssh \
     && ssh-keyscan -t rsa bitbucket.org >> known_hosts \
     && ssh-keyscan -t rsa github.com >> known_hosts \
-    && ssh-keyscan -t rsa gitlab.com/ >> known_hosts
+    && ssh-keyscan -t rsa gitlab.com >> known_hosts
+
+### / PREPARATION PART of image ###
 
 
 
-# TODO continue from https://github.com/BretFisher/php-docker-good-defaults/blob/master/Dockerfile
+### Make base stage as production ###
+FROM prepare as base
 
-
+##
+## Configuration of supervisord, php and nginx
+##
+# supervisord config
+COPY ./docker/app/supervisord.conf /etc/supervisord.conf
 
 # add custom php-fpm pool settings, these get written at entrypoint startup
 ENV FPM_PM_MAX_CHILDREN=20 \
@@ -162,8 +168,7 @@ ENV FPM_PM_MAX_CHILDREN=20 \
     FPM_PING_URI='/---ping' \
     FPM_STATUS_URI='/---status' \
     NGINX_STATUS_URI='/---status-nginx' \
-    NGINX_READ_TIMEOUT=60 \
-    XDEBUG_TRIGGER='PHPSTORM'
+    NGINX_READ_TIMEOUT=60
 
 ### php-fpm config ###
 COPY ./docker/app/zzz-app.conf /tmp/zzz-app.conf
@@ -172,38 +177,146 @@ COPY ./docker/app/zzz-app.conf /tmp/zzz-app.conf
 RUN envsubst '$FPM_PM_MAX_CHILDREN $FPM_PM_START_SERVERS $FPM_PM_MIN_SPARE_SERVERS $FPM_PM_MAX_SPARE_SERVERS $FPM_PING_URI $FPM_STATUS_URI' < /tmp/zzz-app.conf > /usr/local/etc/php-fpm.d/zzz-app.conf
 
 # Use the default production configuration
-# TODO temporary
-RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 # custom php.ini
-COPY ./docker/app/php.ini /tmp/zzz-php.ini
-RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
+COPY ./docker/app/php-prod.ini /tmp/zzz-php.ini
+# use `envsubst` library if need to generate config file bases on some environment (@see example below for php-dev.ini)
+#RUN envsubst '$SOME_GLOBAL_ENV' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
 
 ### nginx config ###
 COPY ./docker/app/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/app/nginx-site.conf /tmp/nginx-site.conf
 RUN envsubst '$FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI $NGINX_READ_TIMEOUT' < /tmp/nginx-site.conf > /etc/nginx/conf.d/default.conf
 
-# TODO temporary decision
-#RUN /bin/bash -c "htpasswd -bn default secret > /etc/nginx/conf.d/nginx.htpasswd"
-#COPY ./docker/app/nginx.htpasswd /etc/nginx/conf.d/nginx.htpasswd
+ARG __PATH=$PATH
+WORKDIR /var/www
 
-### supervisord config ###
-COPY ./docker/app/supervisord.conf /etc/supervisord.conf
+# Install composer and npm dependencies first, in a different location for easier app bind mounting for local development
+##
+## Compose Package Manager
+##
+COPY ./composer*.json ./
+ENV COMPOSER_VENDOR_DIR="/var/www/vendor"
+# RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
+RUN composer install --no-scripts --no-autoloader --ansi --no-interaction --no-dev
+##
+## Node Build Tools
+##
+ENV NODE_ENV="production"
+COPY package*.json ./
+RUN npm config list \
+    # is better then `npm install` for production
+    && npm ci \
+    && npm cache clean --force
+ENV PATH="/var/www/node_modules/.bin:$__PATH"
 
-# copy in app code as late as possible, as it changes the most
-COPY --chown=www-data:www-data ./public /var/www/html/public
-RUN chown -R :www-data /var/www/html/public
-RUN chmod -R g+w /var/www/html/public
+
+
+### dev stage ###
+FROM base as dev
+
+# Use development configuration (overwrite php.ini-production -- @see above)
+RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
+
+RUN install-php-extensions xdebug
+
+ENV XDEBUG_TRIGGER='PHPSTORM'
+# custom php.ini
+COPY ./docker/app/php-dev.ini /tmp/zzz-php.ini
+RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
+
+# in development we can install all dependencies to project root (more convinient for development, for example, debugging)
+WORKDIR /var/www/html
+
+# compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
+ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
+    NODE_ENV="development" \
+    PATH="/var/www/node_modules/.bin:$__PATH"
+
+# 80 - for nginx
+# 9003 - for php debug
+EXPOSE 80 9003
+
+## no need in dev stage run `COPY --chown=www-data:www-data . .` because in dev
+## we will bind mount whole project (@see docker-compose.yml:services.app.volumes)
+
+### copy entrypoint ###
+COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
+RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev
+
+ENTRYPOINT ["docker-php-entrypoint-dev"]
+
+
+
+### test stage ###
+FROM dev as test
+
+COPY ./composer*.json ./
+# RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
+RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
+
+COPY package*.json ./
+RUN npm config list \
+    && npm install --only=development \
+    && npm cache clean --force
+
+COPY --chown=www-data:www-data . .
+
+# https://docs.npmjs.com/cli/v7/commands/npm-audit
+# RUN npm audit
+# TODO think of security checker @see https://github.com/FriendsOfPHP/security-advisories
+# TODO think of running `composer validate` or `composer outdated` or `composer diagnose`
+
+USER root
+COPY --from=aquasec/trivy:latest /usr/local/bin/trivy /usr/local/bin/trivy
+RUN trivy filesystem --exit-code 0 --no-progress /
+
+
+
+### Pre production stage ###
+## is used to not bloat prod image
+## recomenned by Bret Fisher for avoiding put deleted unnecessary files in prod
+FROM test as pre-prod
+
+WORKDIR /var/www/html
+# delete unused in production files
+# node_modules / css / js and images are compiled to ./public
+RUN rm -rfv ./tests \
+    && rm -rfv ./node_modules \
+    # vendor directory for production is in another folder ('/var/www/vendor') (@see base stage)
+    && rm -rfv ./vendor \
+    && rm -rfv ./resources/css \
+    && rm -rfv ./resources/js \
+    # todo think if we need to remove non-persistent data manually
+    && rm -rfv ./bootstrap/cache/data/* \
+    && rm -rfv ./storage/logs/* \
+    && rm -rfv ./storage/framework/sessions/* \
+    && rm -rfv ./storage/framework/views/* \
+    && rm -rfv ./storage/framework/testing/*
+
+
+
+### Prod stage ###
+FROM base as prod
+
+# we already have node_modules / tests / resources/(css|js) / storage in base
+# so we copy from pre-prod without those of 'test' stage
+COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
+
+### copy entrypoint and overwrite default one of base php image ###
+COPY ./docker/app/docker-php-entrypoint-prod /usr/local/bin/
+RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod
+ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
 HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
 
-WORKDIR /var/www/html
-
 # 80 - for nginx
-# 9000 - for php
-# 9001 - for php debug
-EXPOSE 80 9000 9001 9003
+EXPOSE 80
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
+
+
+# TODO think of adding base auth for $FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI pages
+#RUN /bin/bash -c "htpasswd -bn default secret > /etc/nginx/conf.d/nginx.htpasswd"
+#COPY ./docker/app/nginx.htpasswd /etc/nginx/conf.d/nginx.htpasswd
