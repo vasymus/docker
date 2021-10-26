@@ -5,7 +5,8 @@ FROM php:8.0.12-fpm-buster as prepare
 # only if need to install some liberty or php extension
 ENV NGINX_VERSION=1.20.1 \
     NJS_VERSION=0.5.3 \
-    PKG_RELEASE=1~buster
+    PKG_RELEASE=1~buster \
+    NODE_VERSION=14.18.1
 
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
     curl \
@@ -15,9 +16,13 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     git \
     dos2unix \
     openssh-client \
-    # need for nginx
-    gnupg1 \
+    # need for nginx and node
+    # @see https://github.com/nodejs/docker-node/blob/3101ce6b5b3a0308b58d464eef141e0043c3bf5b/14/buster-slim/Dockerfile
+    # @see https://github.com/nginxinc/docker-nginx/blob/f3fe494531f9b157d9c09ba509e412dace54cd4f/stable/debian/Dockerfile
+    gnupg2 \
     ca-certificates \
+    dirmngr \
+    xz-utils \
     && rm -r /var/lib/apt/lists/* \
     # install nginx (copied from official nginx Dockerfile)
     && NGINX_GPGKEY=573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62; \
@@ -33,7 +38,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         done; \
 
         test -z "$found" && echo >&2 "error: failed to fetch GPG key $NGINX_GPGKEY" && exit 1; \
-        apt-get remove --purge --auto-remove -y gnupg1 && rm -rf /var/lib/apt/lists/* \
+        rm -rf /var/lib/apt/lists/* \
         && dpkgArch="$(dpkg --print-architecture)" \
         && nginxPackages=" \
             nginx=${NGINX_VERSION}-${PKG_RELEASE} \
@@ -48,7 +53,8 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
             $nginxPackages \
             gettext-base \
             curl \
-        && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list \
+        && apt-get remove --purge --auto-remove -y \
+        && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list \
         # forward request and error logs to docker log collector
         && ln -sf /dev/stdout /var/log/nginx/access.log \
         && ln -sf /dev/stderr /var/log/nginx/error.log \
@@ -56,41 +62,28 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     # using mlocati/docker-php-extension-installer recomended by official php docker repo
     # @see https://github.com/docker-library/docs/blob/master/php/README.md#php-core-extensions
     && curl -sSLf -o /usr/local/bin/install-php-extensions https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions \
-        && chmod +x /usr/local/bin/install-php-extensions \
-        && install-php-extensions \
-            pdo_mysql \
-            mysqli \
-            json \
-            gd \
-            intl \
-            mbstring \
-            redis \
-            sockets \
-            zip \
-            xml \
-            exif \
-            bcmath \
-            pcntl \
-            gmagick \
-            imagick
-# install composer from official image @see https://hub.docker.com/_/composer
-COPY --from=composer:2.1.9 /usr/bin/composer /usr/bin/composer
-
+    && chmod +x /usr/local/bin/install-php-extensions \
+    && install-php-extensions \
+        pdo_mysql \
+        mysqli \
+        json \
+        gd \
+        intl \
+        mbstring \
+        redis \
+        sockets \
+        zip \
+        xml \
+        exif \
+        bcmath \
+        pcntl \
+        gmagick \
+        imagick \
+        # if install xdebug in `dev` stage there could be incompatibility with other php extensions
+        xdebug \
 ## install node and yarn: copied from official node docker image
 # LTS version of node
-ENV NODE_VERSION 14.18.1
-
-RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
-    && case "${dpkgArch##*-}" in \
-        amd64) ARCH='x64';; \
-        ppc64el) ARCH='ppc64le';; \
-        s390x) ARCH='s390x';; \
-        arm64) ARCH='arm64';; \
-        armhf) ARCH='armv7l';; \
-        i386) ARCH='x86';; \
-        *) echo "unsupported architecture"; exit 1 ;; \
-    esac \
-    # gpg keys listed at https://github.com/nodejs/node#release-keys
+# gpg keys listed at https://github.com/nodejs/node#release-keys
     && set -ex \
     && for key in \
         4ED778F539E3634C779C87C6D7062848A1AB005C \
@@ -108,44 +101,28 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
         gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" || \
         gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" ; \
     done \
-    && curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" \
+    && curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
     && curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
     && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
-    && grep " node-v$NODE_VERSION-linux-$ARCH.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
-    && tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
-    && rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
+    && grep " node-v$NODE_VERSION-linux-x64.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
+    && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
+    && rm "node-v$NODE_VERSION-linux-x64.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
+    && apt-mark auto '.*' > /dev/null \
+    && find /usr/local -type f -executable -exec ldd '{}' ';' \
+        | awk '/=>/ { print $(NF-1) }' \
+        | sort -u \
+        | xargs -r dpkg-query --search \
+        | cut -d: -f1 \
+        | sort -u \
+        | xargs -r apt-mark manual \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests
     && node --version \
     && npm --version
 
-# TODO think need of yarn
-#ENV YARN_VERSION 1.22.15
-#
-#RUN set -ex \
-#    && for key in \
-#        6A010C5166006599AA17F08146C2130DFD2497F5 \
-#    ; do \
-#        gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" || \
-#        gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" ; \
-#    done \
-#    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
-#    && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc" \
-#    && gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
-#    && mkdir -p /opt \
-#    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/ \
-#    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarn /usr/local/bin/yarn \
-#    && ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg \
-#    && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz \
-#    # smoke test
-#    && yarn --version
-
-# add bitbucket, github and gitlab to known hosts for ssh needs
-WORKDIR /root/.ssh
-RUN chmod 0600 /root/.ssh \
-    && ssh-keyscan -t rsa bitbucket.org >> known_hosts \
-    && ssh-keyscan -t rsa github.com >> known_hosts \
-    && ssh-keyscan -t rsa gitlab.com >> known_hosts
+# install composer from official image @see https://hub.docker.com/_/composer
+COPY --from=composer:2.1.9 /usr/bin/composer /usr/bin/composer
 
 ### / PREPARATION PART of image ###
 
@@ -153,6 +130,12 @@ RUN chmod 0600 /root/.ssh \
 
 ### Make base stage as production ###
 FROM prepare as base
+
+# packages that will be used in a docker or in project via `exec()` php function @see https://www.php.net/manual/ru/function.exec.php
+RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
+    gettext-base \
+    dos2unix \
+    && rm -rf /var/lib/apt/lists/*
 
 ##
 ## Configuration of supervisord, php and nginx
@@ -186,12 +169,58 @@ COPY ./docker/app/php-prod.ini /tmp/zzz-php.ini
 ### nginx config ###
 COPY ./docker/app/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/app/nginx-site.conf /tmp/nginx-site.conf
-RUN envsubst '$FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI $NGINX_READ_TIMEOUT' < /tmp/nginx-site.conf > /etc/nginx/conf.d/default.conf
+RUN mkdir -p /etc/nginx/conf.d \
+    && envsubst '$FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI $NGINX_READ_TIMEOUT' < /tmp/nginx-site.conf > /etc/nginx/conf.d/default.conf
 
 ARG __PATH=$PATH
-WORKDIR /var/www
 
-# Install composer and npm dependencies first, in a different location for easier app bind mounting for local development
+### Decided to move `composer install` and `npm install` only to `test` and `prod` stages [but not on `dev`]
+### Think it's more convenient for developer to execute
+### docker-compose exec app bash
+### and run according comands locally
+
+
+
+### dev stage ###
+FROM base as dev
+
+# Use development configuration (overwrite php.ini-production -- @see above)
+RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
+
+ENV XDEBUG_TRIGGER='PHPSTORM'
+# custom php.ini
+COPY ./docker/app/php-dev.ini /tmp/zzz-php.ini
+RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
+
+# in development we can install all dependencies to project root (more convinient for development, for example, debugging)
+# compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
+WORKDIR /var/www/html
+ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
+    NODE_ENV="development" \
+    PATH="/var/www/html/node_modules/.bin:$__PATH"
+
+# 80 - for nginx
+# 9003 - for php debug
+EXPOSE 80 9003
+
+## no need in `dev` stage to run `COPY --chown=www-data:www-data . .` because in dev
+## we will bind mount whole project (@see docker-compose.yml:services.app.volumes)
+
+### copy entrypoint ###
+COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
+RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
+    && chmod 770 /usr/local/bin/docker-php-entrypoint-dev
+
+ENTRYPOINT ["docker-php-entrypoint-dev"]
+
+
+
+### dependencies stage ###
+# for running installing non-dev dependencies of composer and npm ###
+FROM dev as dependencies
+
+# Install composer and npm dependencies first, in a different location
+WORKDIR /var/www
 ##
 ## Compose Package Manager
 ##
@@ -212,53 +241,24 @@ ENV PATH="/var/www/node_modules/.bin:$__PATH"
 
 
 
-### dev stage ###
-FROM base as dev
-
-# Use development configuration (overwrite php.ini-production -- @see above)
-RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-
-RUN install-php-extensions xdebug
-
-ENV XDEBUG_TRIGGER='PHPSTORM'
-# custom php.ini
-COPY ./docker/app/php-dev.ini /tmp/zzz-php.ini
-RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
-
-# in development we can install all dependencies to project root (more convinient for development, for example, debugging)
-WORKDIR /var/www/html
-
-# compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
-ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
-    NODE_ENV="development" \
-    PATH="/var/www/node_modules/.bin:$__PATH"
-
-# 80 - for nginx
-# 9003 - for php debug
-EXPOSE 80 9003
-
-## no need in dev stage run `COPY --chown=www-data:www-data . .` because in dev
-## we will bind mount whole project (@see docker-compose.yml:services.app.volumes)
-
-### copy entrypoint ###
-COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
-RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev
-
-ENTRYPOINT ["docker-php-entrypoint-dev"]
-
-
-
 ### test stage ###
-FROM dev as test
+FROM dependencies as test
 
-COPY ./composer*.json ./
+##
+## Compose Package Manager
+##
 # RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
+# didn't found composer analogue for 'npm install --only=production'
 RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
-
-COPY package*.json ./
+##
+## Node Build Tools
+##
+ENV NODE_ENV="development"
 RUN npm config list \
     && npm install --only=development \
     && npm cache clean --force
+
+WORKDIR /var/www/html
 
 COPY --chown=www-data:www-data . .
 
@@ -278,7 +278,6 @@ RUN trivy filesystem --exit-code 0 --no-progress /
 ## recomenned by Bret Fisher for avoiding put deleted unnecessary files in prod
 FROM test as pre-prod
 
-WORKDIR /var/www/html
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
 RUN rm -rfv ./tests \
@@ -297,7 +296,7 @@ RUN rm -rfv ./tests \
 
 
 ### Prod stage ###
-FROM base as prod
+FROM dependencies as prod
 
 # we already have node_modules / tests / resources/(css|js) / storage in base
 # so we copy from pre-prod without those of 'test' stage
@@ -305,7 +304,8 @@ COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
 
 ### copy entrypoint and overwrite default one of base php image ###
 COPY ./docker/app/docker-php-entrypoint-prod /usr/local/bin/
-RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod
+RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
+    && chmod 770 /usr/local/bin/docker-php-entrypoint-prod
 ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
