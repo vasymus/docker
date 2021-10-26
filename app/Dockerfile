@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
             $nginxPackages \
             gettext-base \
             curl \
-        && apt-get remove --purge --auto-remove -y \
+        # && apt-get remove --purge --auto-remove -y \
         && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list \
         # forward request and error logs to docker log collector
         && ln -sf /dev/stdout /var/log/nginx/access.log \
@@ -77,7 +77,6 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         exif \
         bcmath \
         pcntl \
-        gmagick \
         imagick \
         # if install xdebug in `dev` stage there could be incompatibility with other php extensions
         xdebug \
@@ -115,7 +114,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         | cut -d: -f1 \
         | sort -u \
         | xargs -r apt-mark manual \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+    #&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests
     && node --version \
@@ -131,11 +130,19 @@ COPY --from=composer:2.1.9 /usr/bin/composer /usr/bin/composer
 ### Make base stage as production ###
 FROM prepare as base
 
+# add bitbucket and github to known hosts for ssh needs
+WORKDIR /root/.ssh
+RUN chmod 0600 /root/.ssh \
+    && ssh-keyscan -t rsa bitbucket.org >> known_hosts \
+    && ssh-keyscan -t rsa github.com >> known_hosts \
+    && ssh-keyscan -t rsa gitlab.com >> known_hosts
+
 # packages that will be used in a docker or in project via `exec()` php function @see https://www.php.net/manual/ru/function.exec.php
-RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
-    gettext-base \
-    dos2unix \
-    && rm -rf /var/lib/apt/lists/*
+#RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
+#    gettext-base \
+#    dos2unix \
+#    wget \
+#    && rm -rf /var/lib/apt/lists/*
 
 ##
 ## Configuration of supervisord, php and nginx
@@ -174,6 +181,9 @@ RUN mkdir -p /etc/nginx/conf.d \
 
 ARG __PATH=$PATH
 
+ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
+    PATH="/var/www/html/node_modules/.bin:$__PATH"
+
 ### Decided to move `composer install` and `npm install` only to `test` and `prod` stages [but not on `dev`]
 ### Think it's more convenient for developer to execute
 ### docker-compose exec app bash
@@ -183,6 +193,8 @@ ARG __PATH=$PATH
 
 ### dev stage ###
 FROM base as dev
+
+WORKDIR /var/www/html
 
 # Use development configuration (overwrite php.ini-production -- @see above)
 RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
@@ -194,10 +206,7 @@ RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php
 
 # in development we can install all dependencies to project root (more convinient for development, for example, debugging)
 # compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
-WORKDIR /var/www/html
-ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
-    NODE_ENV="development" \
-    PATH="/var/www/html/node_modules/.bin:$__PATH"
+ENV NODE_ENV="development"
 
 # 80 - for nginx
 # 9003 - for php debug
@@ -217,32 +226,38 @@ ENTRYPOINT ["docker-php-entrypoint-dev"]
 
 ### dependencies stage ###
 # for running installing non-dev dependencies of composer and npm ###
-FROM dev as dependencies
+FROM base as dependencies
 
-# Install composer and npm dependencies first, in a different location
-WORKDIR /var/www
+# exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
+RUN apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx
+RUN apt-get remove --purge --auto-remove -y -o APT::AutoRemove::RecommendsImportant=false
+
+
+### decided not to put dependencies in another dir (for now), because it would require to change accordingly ./public/index.php and ./artisan
+WORKDIR /var/www/html
+
 ##
 ## Compose Package Manager
 ##
-COPY ./composer*.json ./
-ENV COMPOSER_VENDOR_DIR="/var/www/vendor"
+COPY --chown=www-data:www-data ./composer.json ./composer.lock* ./
 # RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
 RUN composer install --no-scripts --no-autoloader --ansi --no-interaction --no-dev
 ##
 ## Node Build Tools
 ##
 ENV NODE_ENV="production"
-COPY package*.json ./
+COPY --chown=www-data:www-data package*.json ./
 RUN npm config list \
     # is better then `npm install` for production
-    && npm ci \
-    && npm cache clean --force
-ENV PATH="/var/www/node_modules/.bin:$__PATH"
+    && npm ci || npm install
+ENV PATH="/var/www/htmls/node_modules/.bin:$__PATH"
 
 
 
 ### test stage ###
 FROM dependencies as test
+
+WORKDIR /var/www/html
 
 ##
 ## Compose Package Manager
@@ -250,26 +265,33 @@ FROM dependencies as test
 # RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
 # didn't found composer analogue for 'npm install --only=production'
 RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
+RUN chown -R www-data:www-data /var/www/html/vendor
+# temporary copy of all code (except for vendor and node_modules), so that we can copy it to /var/www/html (see below)
+# remove those dependencies to not interfier any dev changes in those dirs
+COPY --chown=www-data:www-data . /var/www/temp
+RUN rm -rfv /var/www/temp/vendor \
+    && rm -rfv /var/www/temp/node_modules \
+    # @see https://askubuntu.com/a/86891
+    && cp -a /var/www/temp/. /var/www/html/ \
+    && rm -rfv /var/www/temp
+
 ##
 ## Node Build Tools
 ##
 ENV NODE_ENV="development"
 RUN npm config list \
     && npm install --only=development \
+    && npm run prod \
     && npm cache clean --force
-
-WORKDIR /var/www/html
-
-COPY --chown=www-data:www-data . .
 
 # https://docs.npmjs.com/cli/v7/commands/npm-audit
 # RUN npm audit
 # TODO think of security checker @see https://github.com/FriendsOfPHP/security-advisories
 # TODO think of running `composer validate` or `composer outdated` or `composer diagnose`
 
-USER root
-COPY --from=aquasec/trivy:latest /usr/local/bin/trivy /usr/local/bin/trivy
-RUN trivy filesystem --exit-code 0 --no-progress /
+RUN wget https://github.com/aquasecurity/trivy/releases/download/v0.20.2/trivy_0.20.2_Linux-64bit.deb
+RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
+    && trivy filesystem --exit-code 0 --no-progress /
 
 
 
@@ -280,33 +302,33 @@ FROM test as pre-prod
 
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
-RUN rm -rfv ./tests \
-    && rm -rfv ./node_modules \
-    # vendor directory for production is in another folder ('/var/www/vendor') (@see base stage)
-    && rm -rfv ./vendor \
-    && rm -rfv ./resources/css \
-    && rm -rfv ./resources/js \
+RUN rm -rfv /var/www/html/tests \
+    && rm -rfv /var/www/html/trivy_* \
+    && rm -rfv /var/www/html/node_modules \
+    && rm -rfv /var/www/html/resources/css \
+    && rm -rfv /var/www/html/resources/js \
     # todo think if we need to remove non-persistent data manually
-    && rm -rfv ./bootstrap/cache/data/* \
-    && rm -rfv ./storage/logs/* \
-    && rm -rfv ./storage/framework/sessions/* \
-    && rm -rfv ./storage/framework/views/* \
-    && rm -rfv ./storage/framework/testing/*
+    && rm -rfv /var/www/html/bootstrap/cache/data/* \
+    && rm -rfv /var/www/html/storage/logs/* \
+    && rm -rfv /var/www/html/storage/framework/sessions/* \
+    && rm -rfv /var/www/html/storage/framework/views/* \
+    && rm -rfv /var/www/html/storage/framework/testing/*
 
 
 
 ### Prod stage ###
 FROM dependencies as prod
 
-# we already have node_modules / tests / resources/(css|js) / storage in base
-# so we copy from pre-prod without those of 'test' stage
-COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
-
 ### copy entrypoint and overwrite default one of base php image ###
 COPY ./docker/app/docker-php-entrypoint-prod /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-prod
+
 ENTRYPOINT ["docker-php-entrypoint-prod"]
+
+# we already have node_modules / tests / resources/(css|js) / storage in base
+# so we copy from pre-prod without those of 'test' stage
+COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
 HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1

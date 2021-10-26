@@ -5,9 +5,13 @@
 # run last minute build tools just for local dev
 # this file should just be used to override on local dev in a compose file
 
-export set appFolders="/var/www/html/bootstrap/cache/ /var/www/html/public/ /var/www/html/storage/"
 # ensure bind mount permissions are what we need
-chown -R :www-data "$appFolders"
-chmod -R g+w "$appFolders"
+chown -R :www-data /var/www/html/bootstrap/cache/
+chown -R :www-data /var/www/html/public/
+chown -R :www-data /var/www/html/storage/
+
+chmod -R g+w /var/www/html/bootstrap/cache/
+chmod -R g+w /var/www/html/public/
+chmod -R g+w /var/www/html/storage/
 
 exec "$@"
