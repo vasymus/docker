@@ -1,147 +1,161 @@
-version: '3.8'
+# This docker-compose.yml file is only for development
+# For Docker Swarm use docker-stack.yml
+version: '2.4'
+# version 2.x allows you to use depends_on with conditions that cause
+# the app to wait on mariadb to respond to a healthy healthcheck before app is started
+# v3.x doesn't have this feature yet, and is only needed when use Docker Swarm
 
 services:
-    ### NGINX Server #########################################
-    nginx:
-        build:
-            context: ./docker/nginx
-            args:
-                - DOCKER_LOCALHOST_SERVERNAME=${DOCKER_LOCALHOST_SERVERNAME}
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-nginx:0.1.0"
-        deploy:
-            replicas: 1
-            restart_policy:
-                condition: on-failure
-        volumes:
-            - ./docker/nginx/logs/:/var/log/nginx
-            #- ./docker/nginx/sites/:/etc/nginx/sites-available
-            - ./docker/nginx/ssl/:/etc/nginx/ssl
-            - .:/var/www/html
-        ports:
-            - "${DOCKER_NGINX_HOST_HTTP_PORT}:80"
-            - "${DOCKER_NGINX_HOST_HTTPS_PORT}:443"
-        networks:
-            - "${DOCKER_NETWORK}"
+  ### Reverse-Proxy (traefik) ###
+  proxy:
+    image: traefik:2.5.3
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - 80:80
+      # The Web UI (enabled by --api.insecure=true)
+      - 8080:8080
+      # adminer
+      #- 8000:8080
+      # mailhog
+      #- 8025:8025
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
 
-    ### APP (php-fpm) ##############################################
-    app:
-        build:
-            context: ./docker/app
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-app:0.1.0"
-        deploy:
-            replicas: 1
-            restart_policy:
-                condition: on-failure
-        volumes:
-            - ./docker/app/php.ini:/usr/local/etc/php/php.ini
-            - ./docker/app/supervisor-logs:/var/log
-            - .:/var/www/html:delegated
-        expose:
-            - "9000"
-        networks:
-            - "${DOCKER_NETWORK}"
+  ### APP (php-fpm) ###
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      target: dev
+    volumes:
+      # used delegated mode here on docker for mac for faster disk I/O
+      - .:/var/www/html:delegated
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # change .env XDEBUG_TRIGGER to use other then 'PHPSTORM'
+      XDEBUG_TRIGGER: "${XDEBUG_TRIGGER:-PHPSTORM}"
+      # for xdebug working in cli
+      PHP_IDE_CONFIG: "serverName=Docker"
+    labels:
+      - traefik.http.routers.blog.rule=Host(`${DOCKER_SERVER_NAME:-app.localhost}`)
+      #- traefik.http.routers.blog.tls=true
+      #- traefik.http.routers.blog.tls.certresolver=lets-encrypt
+      #- traefik.port=80
+    depends_on:
+      db:
+        condition: service_healthy
 
-    ### DB (MariaDB) ##############################################
-    db:
-        build:
-            context: ./docker/mariadb
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-db:0.1.0"
-        restart: always
-        deploy:
-            replicas: 1
-            placement:
-                constraints:
-                    - "node.role == manager"
-        volumes:
-            - db-data:/var/lib/mysql
-            - ./docker/mariadb/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
-        environment:
-            - MYSQL_USER=${DOCKER_MARIADB_USER}
-            - MYSQL_PASSWORD=${DOCKER_MARIADB_PASSWORD}
-            - MYSQL_ROOT_PASSWORD=root
-            - TZ=UTC
-        expose:
-            - "3306"
-#        ports:
-#            - "${DOCKER_MARIADB_PORT}:3306"
-        networks:
-            - "${DOCKER_NETWORK}"
+  ### DB (MariaDB) ###
+  db:
+    image: mariadb:10.6.4
+    volumes:
+      - mariadb-db-data:/var/lib/mysql
+    environment:
+      # MYSQL_ROOT_PASSWORD is the only required
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_USER=${DOCKER_MYSQL_USER:-default}
+      - MYSQL_PASSWORD=${DOCKER_MYSQL_PASSWORD:-secret}
+      - MYSQL_DATABASE=${DOCKER_MYSQL_DATABASE:-laravel}
+      # todo
+      - TZ=UTC
+      # didn't want to add any bind mount or additional Dockerfile, so put it to env variable
+      # $$ is used for escaping from docker-compose @see https://docs.docker.com/compose/environment-variables/#substitute-environment-variables-in-compose-files
+      # Init script will be run ONLY on first initialization
+      - |
+        MYSQL_INIT_SCRIPT=
+        ## main database ##
+        CREATE DATABASE IF NOT EXISTS `${DOCKER_MYSQL_DATABASE:-laravel}` COLLATE 'utf8mb4_unicode_ci' ;
+        GRANT ALL ON `${DOCKER_MYSQL_DATABASE:-laravel}`.* TO '${DOCKER_MYSQL_USER:-default}'@'%' ;
 
-    ### Redis ################################################
-    redis:
-        build: ./docker/redis
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-redis:0.1.0"
-        deploy:
-            replicas: 1
-        volumes:
-            - ./docker/redis/data/:/data
-        expose:
-            - "6379"
-        networks:
-            - "${DOCKER_NETWORK}"
+        ## test database ##
+        CREATE DATABASE IF NOT EXISTS `${DOCKER_MYSQL_DATABASE:-laravel}_test` COLLATE 'utf8mb4_unicode_ci' ;
+        GRANT ALL ON `${DOCKER_MYSQL_DATABASE:-laravel}_test`.* TO '${DOCKER_MYSQL_USER:-default}'@'%' ;
 
-    ### Adminer ###########################################
-    adminer:
-        build:
-            context: ./docker/adminer
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-adminer:0.1.0"
-        deploy:
-            replicas: 1
-        environment:
-            - ADMINER_DESIGN=flat
-            - ADM_DEFAULT_SERVER=db
-            - ADMINER_PLUGINS=
-        ports:
-            - "${DOCKER_ADM_PORT}:8080"
-        networks:
-            - "${DOCKER_NETWORK}"
+        FLUSH PRIVILEGES ;
+      - |
+        MYSQL_CONFIG=
+        # MariaDB database server configuration file.
+        #
+        # You can use this file to overwrite the default configuration
+        #
+        # For explanations see
+        # https://mariadb.com/kb/en/configuring-mariadb-with-option-files/
+        timezone='UTC'
+    # didn't want to add any bind mount or additional Dockerfile
+    command:
+      bash -c 'echo "$$MYSQL_INIT_SCRIPT" > /docker-entrypoint-initdb.d/init.sql
+      && chmod 555 /docker-entrypoint-initdb.d/init.sql
+      && echo "$$MYSQL_CONFIG" > /etc/mysql/conf.d/my.cnf
+      && chmod 555 /etc/mysql/conf.d/my.cnf
+      && docker-entrypoint.sh mysqld'
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 20s
+      retries: 10
 
-    ### Mailhog ################################################
-    mailhog:
-        build: ./docker/mailhog
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-mailhog:0.1.0"
-        deploy:
-            replicas: 1
-        volumes:
-            - ./docker/mailhog/maildir:/home/mailhog/maildir
-#        environment:
-#            - MH_STORAGE=maildir
-#            - MH_MAILDIR_PATH=/home/mailhog/maildir/mails
-             ## authentication: mpl:qwe123
-#            - MH_AUTH_FILE=/home/mailhog/maildir/auth.txt
-        # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
-        command: -invite-jim=1
-        ports:
-            - "${DOCKER_MAILHOG_PORT1}:1025"
-            - "${DOCKER_MAILHOG_PORT2}:8025"
-        networks:
-            - "${DOCKER_NETWORK}"
+  ### Redis ###
+  redis:
+    image: redis:6.2.6
+    volumes:
+      - redis-data:/data
 
-    ### REDISWEBUI ################################################
-    redis-webui:
-        build:
-            context: ./docker/redis-webui
-        image: "${DOCKERHUB_ID}/${DOCKERHUB_PROJECT_REPO_PREFIX}-redis-webui:0.1.0"
-        deploy:
-            replicas: 1
-        environment:
-            - ADMIN_USER=${DOCKER_REDIS_WEBUI_USERNAME}
-            - ADMIN_PASS=${DOCKER_REDIS_WEBUI_PASSWORD}
-            - REDIS_1_HOST=redis
-            - REDIS_1_PORT=6379
-        networks:
-            - "${DOCKER_NETWORK}"
-        ports:
-            - "${DOCKER_REDIS_WEBUI_PORT}:80"
+  ### Adminer ###
+  adminer:
+    image: adminer:4.8.0-standalone
+    environment:
+      - ADMINER_DESIGN=flat
+      - ADM_DEFAULT_SERVER=db
+      - ADMINER_PLUGINS=
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - traefik.http.routers.blog.rule=Host(`adminer-${DOCKER_SERVER_NAME:-app.localhost}`)
 
-networks:
-    mynetwork: ## !!!the name of network should be the same as ${DOCKER_NETWORK} !!!
-        driver: "${DOCKER_NETWORK_DRIVER}"
-        ## custom name for network
-        ## if omit the name would be something like `mynetwork_mynetwork`
-        name: mynetwork
+  ### Mailhog ###
+  mailhog:
+    image: mailhog/mailhog
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8025 || exit 1"]
+    labels:
+      - traefik.http.routers.blog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
+    # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
+    command: -invite-jim=1
+    environment:
+      MH_STORAGE: mongodb
+      MH_MONGO_URI: mongo:27017
+      MH_MONGO_DB: mailhog
+
+  ### Redis WebUI ###
+  redis-webui:
+    image: erikdubbelboer/phpredisadmin:v1.13.2
+    environment:
+      - ADMIN_USER=default
+      - ADMIN_PASS=secret
+      - REDIS_1_HOST=redis
+      - REDIS_1_PORT=6379
+    labels:
+      - traefik.http.routers.blog.rule=Host(`redis-${DOCKER_SERVER_NAME:-app.localhost}`)
+    depends_on:
+      - redis
+
+  ### mongo ###
+  # need for mailhog storage
+  mongo:
+    image: mongo:5.0.3-focal
+    volumes:
+      - mongo-mail-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: mailhog
 
 volumes:
-    db-data:
-        external: true
-
+  mariadb-db-data:
+  redis-data:
+  mongo-mail-data:
