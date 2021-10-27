@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     git \
     dos2unix \
     openssh-client \
+    zip \
+    unzip \
     # need for nginx and node
     # @see https://github.com/nodejs/docker-node/blob/3101ce6b5b3a0308b58d464eef141e0043c3bf5b/14/buster-slim/Dockerfile
     # @see https://github.com/nginxinc/docker-nginx/blob/f3fe494531f9b157d9c09ba509e412dace54cd4f/stable/debian/Dockerfile
