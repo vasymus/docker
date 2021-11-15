@@ -222,6 +222,8 @@ COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-dev
 
+# for running some scripts as www-data inside container
+RUN apt-get update && apt-get install -y sudo
 
 
 ### dependencies stage ###
