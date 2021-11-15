@@ -1,6 +1,6 @@
 #!/bin/sh
 # todo think if we need `-e` option: 'Exit immediately if a command exits with a non-zero status.'
-# set -e
+set -e
 
 # run last minute build tools just for local dev
 # this file should just be used to override on local dev in a compose file

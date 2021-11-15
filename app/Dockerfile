@@ -224,6 +224,8 @@ RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
 
 ENTRYPOINT ["docker-php-entrypoint-dev"]
 
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
+
 
 
 ### dependencies stage ###
