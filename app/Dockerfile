@@ -222,10 +222,6 @@ COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-dev
 
-ENTRYPOINT ["docker-php-entrypoint-dev"]
-
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
-
 
 
 ### dependencies stage ###
