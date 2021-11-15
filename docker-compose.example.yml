@@ -42,7 +42,7 @@ services:
             # for xdebug working in cli
             PHP_IDE_CONFIG: "serverName=Docker"
         labels:
-            - traefik.http.routers.blog.rule=Host(`${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.app.rule=Host(`${DOCKER_SERVER_NAME:-app.localhost}`)
             #- traefik.http.routers.blog.tls=true
             #- traefik.http.routers.blog.tls.certresolver=lets-encrypt
             #- traefik.port=80
@@ -116,7 +116,7 @@ services:
             db:
                 condition: service_healthy
         labels:
-            - traefik.http.routers.blog.rule=Host(`adminer-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.adminer.rule=Host(`adminer-${DOCKER_SERVER_NAME:-app.localhost}`)
 
     ### Mailhog ###
     mailhog:
@@ -124,7 +124,7 @@ services:
         healthcheck:
             test: ["CMD-SHELL", "nc -z localhost 8025 || exit 1"]
         labels:
-            - traefik.http.routers.blog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.mailhog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
         # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
         command: -invite-jim=1
         environment:
@@ -141,7 +141,7 @@ services:
             - REDIS_1_HOST=redis
             - REDIS_1_PORT=6379
         labels:
-            - traefik.http.routers.blog.rule=Host(`redis-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.redis.rule=Host(`redis-${DOCKER_SERVER_NAME:-app.localhost}`)
         depends_on:
             - redis
 
