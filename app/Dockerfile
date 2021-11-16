@@ -55,7 +55,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
             $nginxPackages \
             gettext-base \
             curl \
-        # && apt-get remove --purge --auto-remove -y \
+        #&& apt-get remove --purge --auto-remove -y \
         && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list \
         # forward request and error logs to docker log collector
         && ln -sf /dev/stdout /var/log/nginx/access.log \
@@ -116,7 +116,9 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         | cut -d: -f1 \
         | sort -u \
         | xargs -r apt-mark manual \
-    #&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+    # exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
+    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests
     && node --version \
@@ -231,8 +233,8 @@ RUN apt-get update && apt-get install -y sudo
 FROM base as dependencies
 
 # exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
-RUN apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx
-RUN apt-get remove --purge --auto-remove -y -o APT::AutoRemove::RecommendsImportant=false
+#RUN apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx
+#RUN apt-get remove --purge --auto-remove -y -o APT::AutoRemove::RecommendsImportant=false
 
 # in laravel `env()` function take environemt variables from .env file or from OS global environment
 # in production we put all environments to OS global environment
