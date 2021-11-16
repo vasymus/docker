@@ -1,3 +1,20 @@
+### Docker Images Update
+
+#### Docker Base Image Update
+
+Go to the root of the project and run:
+
+```shell
+# authenticate to docker hub
+docker login
+
+# build image with adding tag
+docker image build --file ./docker/app/base.Dockerfile --tag vasymus/base-php-nginx-node:$MY_TAG_HERE .
+
+# push docker image to repository
+docker image push vasymus/base-php-nginx-node:$MY_TAG_HERE
+```
+
 ### Docker Troubleshooting
 
 #### Permissions troubles
