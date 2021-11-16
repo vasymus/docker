@@ -50,6 +50,7 @@ COPY ./docker/app/nginx-site.conf /tmp/nginx-site.conf
 RUN mkdir -p /etc/nginx/conf.d \
     && envsubst '$FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI $NGINX_READ_TIMEOUT' < /tmp/nginx-site.conf > /etc/nginx/conf.d/default.conf
 
+# Dockerfile private variable -- not for build
 ARG __PATH=$PATH
 
 ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
@@ -95,6 +96,7 @@ RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
 RUN apt-get update && apt-get install -y sudo
 
 
+
 ### dependencies stage ###
 # for running installing non-dev dependencies of composer and npm ###
 FROM base as dependencies
@@ -115,8 +117,8 @@ ENV APP_NAME="Lara 8 src" \
     # errors in docker should go to stdout (not in file, because the file could consume all space on disk)
     LOG_CHANNEL="errorlog" \
     LOG_LEVEL="debug" \
-    DB_CONNECTION=mysql \
-    DB_HOST=db \
+    DB_CONNECTION="mysql" \
+    DB_HOST="db" \
     DB_PORT=3306 \
     DB_DATABASE="laravel" \
     DB_USERNAME="default" \
@@ -210,11 +212,16 @@ RUN rm -rfv /var/www/html/tests \
     && rm -rfv /var/www/html/node_modules \
     && rm -rfv /var/www/html/resources/css \
     && rm -rfv /var/www/html/resources/js \
+    && rm -rfv /var/www/html/resources/images \
+    && rm -rfv /var/www/html/resources/fonts \
     # todo think if we need to remove non-persistent data manually
     && rm -rfv /var/www/html/bootstrap/cache/data/* \
     && rm -rfv /var/www/html/storage/logs/* \
+    && rm -rfv /var/www/html/storage/media-library/temp/* \
+    && rm -rfv /var/www/html/storage/debugbar/* \
     && rm -rfv /var/www/html/storage/framework/sessions/* \
     && rm -rfv /var/www/html/storage/framework/views/* \
+
     && rm -rfv /var/www/html/storage/framework/testing/*
 
 
