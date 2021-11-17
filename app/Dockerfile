@@ -106,37 +106,19 @@ FROM base as dependencies
 #RUN apt-get remove --purge --auto-remove -y -o APT::AutoRemove::RecommendsImportant=false
 
 # in laravel `env()` function take environemt variables from .env file or from OS global environment
-# in production we put all environments to OS global environment
+# in production we put all environments to OS global environment:
+# either in docker-stack.yml services.app.environment or here
 # in dev we assume that developer manually create .env file (based on .env.example)
-ENV APP_NAME="Lara 8 src" \
-    APP_ENV="production" \
-    # temporary key for building only. Real key should be pass via docker secret or other hidden way
-    APP_KEY="base64:rLuN5t3YwZvIyOn+/I3AHD2nJbYIUcVXHq+PqJH5IZ8=" \
+ENV APP_ENV="production" \
     APP_DEBUG="false" \
     APP_URL="http://localhost" \
     # errors in docker should go to stdout (not in file, because the file could consume all space on disk)
     LOG_CHANNEL="errorlog" \
     LOG_LEVEL="debug" \
     DB_CONNECTION="mysql" \
-    DB_HOST="db" \
     DB_PORT=3306 \
-    DB_DATABASE="laravel" \
-    DB_USERNAME="default" \
-    DB_PASSWORD="secret" \
     BROADCAST_DRIVER="log" \
-    CACHE_DRIVER="array" \
-    FILESYSTEM_DRIVER="local" \
-    QUEUE_CONNECTION="sync" \
-    SESSION_DRIVER="file" \
-    SESSION_LIFETIME=120 \
-    MAIL_MAILER="smtp" \
-    MAIL_HOST="mailhog" \
-    MAIL_PORT=1025 \
-    MAIL_USERNAME=null \
-    MAIL_PASSWORD=null \
-    MAIL_ENCRYPTION=null \
-    MAIL_FROM_ADDRESS=null \
-    MAIL_FROM_NAME="${APP_NAME}"
+    SESSION_LIFETIME=120
 
 ### decided not to put dependencies in another dir (for now), because it would require to change accordingly ./public/index.php and ./artisan
 WORKDIR /var/www/html
