@@ -1,9 +1,6 @@
 # This docker-compose.yml file is only for development
 # For Docker Swarm use docker-stack.yml
-version: '2.4'
-# version 2.x allows you to use depends_on with conditions that cause
-# the app to wait on mariadb to respond to a healthy healthcheck before app is started
-# v3.x doesn't have this feature yet, and is only needed when use Docker Swarm
+version: '3.9'
 
 services:
     ### Reverse-Proxy (traefik) ###
@@ -16,10 +13,6 @@ services:
             - 80:80
             # The Web UI (enabled by --api.insecure=true)
             - 8080:8080
-            # adminer
-            #- 8000:8080
-            # mailhog
-            #- 8025:8025
         volumes:
             # So that Traefik can listen to the Docker events
             - /var/run/docker.sock:/var/run/docker.sock
@@ -42,13 +35,15 @@ services:
             # for xdebug working in cli
             PHP_IDE_CONFIG: "serverName=Docker"
         labels:
-            - traefik.http.routers.blog.rule=Host(`${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.app.rule=Host(`${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.services.app.loadbalancer.server.port=80
             #- traefik.http.routers.blog.tls=true
             #- traefik.http.routers.blog.tls.certresolver=lets-encrypt
             #- traefik.port=80
+        entrypoint: /usr/local/bin/docker-php-entrypoint-dev
+        command: ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
         depends_on:
-            db:
-                condition: service_healthy
+            - db
 
     ### DB (MariaDB) ###
     db:
@@ -61,8 +56,6 @@ services:
             - MYSQL_USER=${DOCKER_MYSQL_USER:-default}
             - MYSQL_PASSWORD=${DOCKER_MYSQL_PASSWORD:-secret}
             - MYSQL_DATABASE=${DOCKER_MYSQL_DATABASE:-laravel}
-            # todo
-            - TZ=UTC
             # didn't want to add any bind mount or additional Dockerfile, so put it to env variable
             # $$ is used for escaping from docker-compose @see https://docs.docker.com/compose/environment-variables/#substitute-environment-variables-in-compose-files
             # Init script will be run ONLY on first initialization
@@ -79,13 +72,14 @@ services:
                 FLUSH PRIVILEGES ;
             - |
                 MYSQL_CONFIG=
+                [mysqld]
                 # MariaDB database server configuration file.
                 #
                 # You can use this file to overwrite the default configuration
                 #
                 # For explanations see
                 # https://mariadb.com/kb/en/configuring-mariadb-with-option-files/
-                timezone='UTC'
+                default_time_zone='UTC'
         # didn't want to add any bind mount or additional Dockerfile
         command:
             bash -c 'echo "$$MYSQL_INIT_SCRIPT" > /docker-entrypoint-initdb.d/init.sql
@@ -113,24 +107,17 @@ services:
             - ADM_DEFAULT_SERVER=db
             - ADMINER_PLUGINS=
         depends_on:
-            db:
-                condition: service_healthy
+            - db
         labels:
-            - traefik.http.routers.blog.rule=Host(`adminer-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.adminer.rule=Host(`adminer-${DOCKER_SERVER_NAME:-app.localhost}`)
 
     ### Mailhog ###
     mailhog:
         image: mailhog/mailhog
-        healthcheck:
-            test: ["CMD-SHELL", "nc -z localhost 8025 || exit 1"]
         labels:
-            - traefik.http.routers.blog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.mailhog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
         # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
         command: -invite-jim=1
-        environment:
-            MH_STORAGE: mongodb
-            MH_MONGO_URI: mongo:27017
-            MH_MONGO_DB: mailhog
 
     ### Redis WebUI ###
     redis-webui:
@@ -141,22 +128,10 @@ services:
             - REDIS_1_HOST=redis
             - REDIS_1_PORT=6379
         labels:
-            - traefik.http.routers.blog.rule=Host(`redis-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.routers.redis.rule=Host(`redis-${DOCKER_SERVER_NAME:-app.localhost}`)
         depends_on:
             - redis
-
-    ### mongo ###
-    # need for mailhog storage
-    mongo:
-        image: mongo:5.0.3-focal
-        volumes:
-            - mongo-mail-data:/data/db
-        environment:
-            MONGO_INITDB_ROOT_USERNAME: root
-            MONGO_INITDB_ROOT_PASSWORD: root
-            MONGO_INITDB_DATABASE: mailhog
 
 volumes:
     mariadb-db-data:
     redis-data:
-    mongo-mail-data:
