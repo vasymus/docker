@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+# run last minute build tools just for local dev
+# this file should just be used to override on local dev in a compose file
+
+# ensure bind mount permissions are what we need
+#echo "running 'chown -R :www-data'. It will take some time..." >&2
+#chown -R :www-data /var/www/html/bootstrap/cache/
+#chown -R :www-data /var/www/html/public/
+#chown -R :www-data /var/www/html/storage/
+
+#echo "running 'chmod -R g+w'. It will take some time..." >&2
+#chmod -R g+w /var/www/html/bootstrap/cache/
+#chmod -R g+w /var/www/html/public/
+#chmod -R g+w /var/www/html/storage/
+
+exec "$@"

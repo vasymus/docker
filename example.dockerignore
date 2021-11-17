@@ -1,0 +1,37 @@
+# @see https://docs.docker.com/engine/reference/builder/#dockerignore-file
+# add git-ignore syntax here of things you don't want copied into docker image
+.git
+.vscode
+.idea
+.editorconfig
+/bootstrap/cache/*
+/database/*.sqlite*
+*Dockerfile*
+#**/*Dockerfile*
+*docker-compose*
+*docker-stack*
+# for build the vendor and node_modules in the image, and not copy from host
+/node_modules
+/public/hot
+/public/storage
+/public/vendor
+# ignore everything from storage
+# except for storage/app/persistent and storage/app/public/persistent
+# should be adjusted for concrete project if need
+!/storage/app/persistent/
+!/storage/app/public/persistent/
+/storage/logs/*
+/storage/media-library/temp/*
+/storage/debugbar/*
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+.env
+.env.backup
+.phpunit.result.cache
+docker-compose.override.yml
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
