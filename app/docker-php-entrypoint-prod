@@ -1,10 +1,52 @@
-#!/bin/sh
+#!/bin/bash
 set -e
+
+# usage: file_env VAR [DEFAULT]
+#    ie: file_env 'XYZ_DB_PASSWORD' 'example'
+# (will allow for "$XYZ_DB_PASSWORD_FILE" to fill in the value of
+#  "$XYZ_DB_PASSWORD" from a file, especially for Docker's secrets feature)
+file_env() {
+	local var="$1"
+	local fileVar="${var}_FILE"
+	local def="${2:-}"
+	if [ "${!var:-}" ] && [ "${!fileVar:-}" ]; then
+		echo >&2 "error: both $var and $fileVar are set (but are exclusive)"
+		exit 1
+	fi
+	local val="$def"
+	if [ "${!var:-}" ]; then
+		val="${!var}"
+	elif [ "${!fileVar:-}" ]; then
+		val="$(< "${!fileVar}")"
+	fi
+	export "$var"="$val"
+	unset "$fileVar"
+}
+
+file_env 'MAILGUN_SECRET'
+file_env 'APP_KEY'
+file_env 'DB_USERNAME'
+file_env 'DB_PASSWORD'
 
 # put here any production bash scripts if need
 composer dump-autoload -o
+
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+
+echo "running 'chown -R :www-data'. It will take some time..." >&2
+chown -R :www-data /var/www/html/bootstrap/cache/
+chown -R :www-data /var/www/html/public/
+chown -R :www-data /var/www/html/storage/
+
+echo "running 'chmod -R g+w'. It will take some time..." >&2
+chmod -R g+w /var/www/html/bootstrap/cache/
+chmod -R g+w /var/www/html/public/
+chmod -R g+w /var/www/html/storage/
+
+php artisan migrate --force
+# All caution checks before run seeds should be done in according seeder classes
+php artisan db:seed --force
 
 exec "$@"
