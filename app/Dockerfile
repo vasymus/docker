@@ -15,12 +15,6 @@ RUN chmod 0600 /root/.ssh \
 #    wget \
 #    && rm -rf /var/lib/apt/lists/*
 
-##
-## Configuration of supervisord, php and nginx
-##
-# supervisord config
-COPY ./docker/app/supervisord.conf /etc/supervisord.conf
-
 # add custom php-fpm pool settings, these get written at entrypoint startup
 ENV FPM_PM_MAX_CHILDREN=20 \
     FPM_PM_START_SERVERS=2 \
@@ -95,6 +89,11 @@ RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
 # for running some scripts as www-data inside container
 RUN apt-get update && apt-get install -y sudo
 
+##
+## Configuration of supervisord, php and nginx
+##
+# supervisord config
+COPY ./docker/app/supervisord.conf /etc/supervisord.conf
 
 
 ### dependencies stage ###
@@ -223,10 +222,16 @@ ENTRYPOINT ["docker-php-entrypoint-prod"]
 COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
-HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
+#HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
 
 # 80 - for nginx
 EXPOSE 80
+
+##
+## Configuration of supervisord, php and nginx
+##
+# supervisord config
+COPY ./docker/app/supervisord.conf /etc/supervisord.conf
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
 

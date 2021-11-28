@@ -36,6 +36,14 @@ chmod -R g+w /var/www/html/storage/
 
 ## Deploy (docker swarm)
 
+### Init docker swarm
+
+```shell
+docker swarm init --advertise-addr "$hostIp"
+```
+
+Create `docker-stack.yml` with according content via terminal
+
 ### Create secrets
 
 Create docker swarm secrets via echo but without displaying secret values in bash history. Run:
@@ -56,11 +64,7 @@ echo "$mailgun_secret" | docker secret create mailgun_secret -
 echo "$app_key" | docker secret create app_key -
 
 # delete bash shell variables
-unset db_root_password
-unset db_user
-unset db_password
-unset mailgun_secret
-unset app_key
+unset db_root_password db_user db_password mailgun_secret app_key
 ```
 
 ### Run docker swarm
@@ -68,5 +72,10 @@ unset app_key
 Create `docker-stack.yml` via console terminal and run docker swarm:
 
 ```shell
-docker stack deploy $stackName -c <(docker-compose -f ./docker-stack.yml config)
+docker stack deploy $stackName -c docker-stack.yml
 ```
+
+
+### Useful Resources
+
+- [https://dockerswarm.rocks/](https://dockerswarm.rocks/)
