@@ -45,8 +45,8 @@ chmod -R g+w /var/www/html/bootstrap/cache/
 chmod -R g+w /var/www/html/public/
 chmod -R g+w /var/www/html/storage/
 
-#php artisan migrate --force
+php artisan migrate --force
 # All caution checks before run seeds should be done in according seeder classes
-#php artisan db:seed --force
+php artisan db:seed --force
 
 exec "$@"
