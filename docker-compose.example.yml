@@ -116,6 +116,7 @@ services:
         image: mailhog/mailhog
         labels:
             - traefik.http.routers.mailhog.rule=Host(`mail-${DOCKER_SERVER_NAME:-app.localhost}`)
+            - traefik.http.services.mailhog.loadbalancer.server.port=8025
         # About command @see https://github.com/mailhog/MailHog/issues/187#issuecomment-733009406
         command: -invite-jim=1
 
