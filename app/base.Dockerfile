@@ -1,4 +1,5 @@
 # vasymus/base-php-nginx-node:php-8.0.12-nginx-1.20.1-node-14.18.1
+# vasymus/base-php-nginx-node:php-7.4.27-nginx-1.20.1-node-14.18.1
 FROM php:8.0.12-fpm-buster as prepare
 
 ### PREPARATION PART of image ###
