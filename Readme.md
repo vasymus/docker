@@ -33,3 +33,4 @@ chmod -R g+w /var/www/html/bootstrap/cache/
 chmod -R g+w /var/www/html/public/
 chmod -R g+w /var/www/html/storage/
 ```
+
