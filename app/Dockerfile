@@ -1,6 +1,6 @@
 ### Make base stage as production ###
 # vasymus/base-php-nginx-node:php-7.4.27-nginx-1.20.1-node-14.18.1 -- temporary decision
-FROM vasymus/base-php-nginx-node:php-8.0.12-nginx-1.20.1-node-14.18.1 as base
+FROM vasymus/base-php-nginx-node:php-8.0.15-nginx-1.20.1-node-16.13.2 as base
 
 # add bitbucket and github to known hosts for ssh needs
 WORKDIR /root/.ssh

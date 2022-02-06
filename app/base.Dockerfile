@@ -1,6 +1,7 @@
 # vasymus/base-php-nginx-node:php-8.0.12-nginx-1.20.1-node-14.18.1
 # vasymus/base-php-nginx-node:php-7.4.27-nginx-1.20.1-node-14.18.1
-FROM php:8.0.12-fpm-buster as prepare
+# vasymus/base-php-nginx-node:php-8.0.15-nginx-1.20.1-node-16.13.2
+FROM php:8.0.15-fpm-buster as prepare
 
 ### PREPARATION PART of image ###
 # should make any changes to it as less as possible
@@ -8,7 +9,7 @@ FROM php:8.0.12-fpm-buster as prepare
 ENV NGINX_VERSION=1.20.1 \
     NJS_VERSION=0.5.3 \
     PKG_RELEASE=1~buster \
-    NODE_VERSION=14.18.1
+    NODE_VERSION=16.13.2
 
 RUN apt-get update && apt-get install --no-install-recommends --no-install-suggests -y \
     curl \
@@ -119,7 +120,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         | sort -u \
         | xargs -r apt-mark manual \
     # exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
-    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base \
+    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base unzip \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests
@@ -127,6 +128,6 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     && npm --version
 
 # install composer from official image @see https://hub.docker.com/_/composer
-COPY --from=composer:2.1.9 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.2.5 /usr/bin/composer /usr/bin/composer
 
 ### / PREPARATION PART of image ###
