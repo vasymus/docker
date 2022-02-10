@@ -180,7 +180,7 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 # custom php.ini
 COPY ./docker/app/php-prod.ini /tmp/zzz-php.ini
 # use `envsubst` library if need to generate config file bases on some environment (@see example below for php-dev.ini)
-#RUN envsubst '$SOME_GLOBAL_ENV' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
+RUN envsubst '$SOME_ENV_VAR1 $SOME_ENV_VAR2' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
 
 ### nginx config ###
 COPY ./docker/app/nginx.conf /etc/nginx/nginx.conf
@@ -197,10 +197,9 @@ WORKDIR /var/www/html
 # Use development configuration (overwrite php.ini-production -- @see above)
 RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
-ENV XDEBUG_TRIGGER='PHPSTORM'
 # custom php.ini
 COPY ./docker/app/php-dev.ini /tmp/zzz-php.ini
-RUN envsubst '$XDEBUG_TRIGGER' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
+RUN envsubst '$SOME_ENV_VAR1 $SOME_ENV_VAR2' < /tmp/zzz-php.ini > "$PHP_INI_DIR/conf.d/zzz-php.ini"
 
 # in development we can install all dependencies to project root (more convinient for development, for example, debugging)
 # compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
