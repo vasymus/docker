@@ -1,6 +1,7 @@
 # @see https://docs.docker.com/engine/reference/builder/#dockerignore-file
 # add git-ignore syntax here of things you don't want copied into docker image
 .git
+.github
 .vscode
 .idea
 .editorconfig
