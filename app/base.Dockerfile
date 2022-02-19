@@ -120,7 +120,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         | sort -u \
         | xargs -r apt-mark manual \
     # exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
-    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base unzip \
+    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base unzip curl \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests

@@ -86,7 +86,7 @@ RUN if [ ${XDEBUG_ON} = true ]; then \
 ;fi
 
 # in development we can install all dependencies to project root (more convinient for development, for example, debugging)
-# compose install / npm install could be done developer manually after he do `docker-compose exec app bash`
+# compose install / npm install could be done developer manually after running `docker-compose exec app bash`
 ENV NODE_ENV="development"
 
 # 80 - for nginx
@@ -110,22 +110,17 @@ RUN apt-get update && apt-get install -y sudo
 # for running installing non-dev dependencies of composer and npm ###
 FROM base as dependencies
 
-# exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
-#RUN apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx
-#RUN apt-get remove --purge --auto-remove -y -o APT::AutoRemove::RecommendsImportant=false
-
-# in laravel `env()` function take environemt variables from .env file or from OS global environment
+# in laravel `env()` function take environemt variables from .env file or from OS global environment (global environment have priority over .env file)
 # in production we put all environments to OS global environment
 # in dev we assume that developer manually create .env file (based on .env.example)
-ENV APP_NAME="Lara 8 src" \
+ENV APP_NAME="Parket Lux" \
     APP_ENV="production" \
     # temporary key for building only. Real key should be pass via docker secret or other hidden way
     APP_KEY="base64:rLuN5t3YwZvIyOn+/I3AHD2nJbYIUcVXHq+PqJH5IZ8=" \
     APP_DEBUG="false" \
     APP_URL="http://localhost" \
     # errors in docker should go to stdout (not in file, because the file could consume all space on disk)
-    LOG_CHANNEL="errorlog" \
-    LOG_LEVEL="debug" \
+    LOG_CHANNEL="stderr" \
     DB_CONNECTION="mysql" \
     DB_HOST="db" \
     DB_PORT=3306 \
@@ -164,7 +159,7 @@ COPY --chown=www-data:www-data package*.json ./
 RUN npm config list \
     # is better then `npm install` for production
     && npm ci || npm install
-ENV PATH="/var/www/htmls/node_modules/.bin:$__PATH"
+ENV PATH="/var/www/html/node_modules/.bin:$__PATH"
 
 
 
@@ -230,6 +225,7 @@ RUN rm -rfv /var/www/html/tests \
     && rm -rfv /var/www/html/storage/debugbar/* \
     && rm -rfv /var/www/html/storage/framework/sessions/* \
     && rm -rfv /var/www/html/storage/framework/views/* \
+    && rm -rfv /var/www/html/storage/framework/cache/data/* \
 
     && rm -rfv /var/www/html/storage/framework/testing/*
 

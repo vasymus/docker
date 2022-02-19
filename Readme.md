@@ -34,3 +34,25 @@ chmod -R g+w /var/www/html/public/
 chmod -R g+w /var/www/html/storage/
 ```
 
+## Deploy (docker swarm)
+
+### Init docker swarm
+
+```shell
+docker swarm init --advertise-addr "$hostIp"
+```
+
+Create `docker-stack.yml` with according content via terminal
+
+### Run docker swarm
+
+Create `docker-stack.yml` via console terminal and run docker swarm:
+
+```shell
+docker-compose --file docker-stack.template.yml config | docker stack deploy $stackName -c -
+```
+
+
+### Useful Resources
+
+- [https://dockerswarm.rocks/](https://dockerswarm.rocks/)
