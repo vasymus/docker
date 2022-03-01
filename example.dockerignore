@@ -5,6 +5,7 @@
 .vscode
 .idea
 .editorconfig
+___docs
 /bootstrap/cache/*
 /database/*.sqlite*
 *Dockerfile*
