@@ -51,12 +51,6 @@ COPY ./docker/app/nginx-site.conf /tmp/nginx-site.conf
 RUN mkdir -p /etc/nginx/conf.d \
     && envsubst '$FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI $NGINX_READ_TIMEOUT' < /tmp/nginx-site.conf > /etc/nginx/conf.d/default.conf
 
-# Dockerfile private variable -- not for build
-ARG __PATH=$PATH
-
-ENV COMPOSER_VENDOR_DIR="/var/www/html/vendor" \
-    PATH="/var/www/html/node_modules/.bin:$__PATH"
-
 ### Decided to move `composer install` and `npm install` only to `test` and `prod` stages [but not on `dev`]
 ### Think it's more convenient for developer to execute
 ### docker-compose exec app bash
@@ -142,7 +136,11 @@ ENV APP_NAME="Parket Lux" \
     MAIL_FROM_ADDRESS=null \
     MAIL_FROM_NAME="${APP_NAME}"
 
-### decided not to put dependencies in another dir (for now), because it would require to change accordingly ./public/index.php and ./artisan
+# env variables for composer and npm
+ENV COMPOSER_VENDOR_DIR="/var/www/vendor" \
+    PATH="/var/www/node_modules/.bin:$PATH" \
+    NODE_PATH=/var/www/node_modules
+
 WORKDIR /var/www/html
 
 ##
@@ -154,12 +152,16 @@ RUN composer install --no-scripts --no-autoloader --ansi --no-interaction --no-d
 ##
 ## Node Build Tools
 ##
-ENV NODE_ENV="production"
-COPY --chown=www-data:www-data package*.json ./
+WORKDIR /var/www
+ENV NODE_ENV="development"
+COPY --chown=www-data:www-data ./package*.json ./
+COPY --chown=www-data:www-data ./resources/js/vendor ./resources/js/vendor
 RUN npm config list \
     # is better then `npm install` for production
     && npm ci || npm install
-ENV PATH="/var/www/html/node_modules/.bin:$__PATH"
+
+WORKDIR /var/www/html
+COPY --chown=www-data:www-data ./package*.json ./webpack.mix.js ./
 
 
 
@@ -167,31 +169,6 @@ ENV PATH="/var/www/html/node_modules/.bin:$__PATH"
 FROM dependencies as test
 
 WORKDIR /var/www/html
-
-##
-## Compose Package Manager
-##
-# RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
-# didn't found composer analogue for 'npm install --only=production'
-RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
-RUN chown -R www-data:www-data /var/www/html/vendor
-# temporary copy of all code (except for vendor and node_modules), so that we can copy it to /var/www/html (see below)
-# remove those dependencies to not interfier any dev changes in those dirs
-COPY --chown=www-data:www-data . /var/www/temp
-RUN rm -rfv /var/www/temp/vendor \
-    && rm -rfv /var/www/temp/node_modules \
-    # @see https://askubuntu.com/a/86891
-    && cp -a /var/www/temp/. /var/www/html/ \
-    && rm -rfv /var/www/temp
-
-##
-## Node Build Tools
-##
-ENV NODE_ENV="development"
-RUN npm config list \
-    && npm install --only=development \
-    && npm run prod \
-    && npm cache clean --force
 
 # https://docs.npmjs.com/cli/v7/commands/npm-audit
 # RUN npm audit
@@ -206,12 +183,18 @@ RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
 
 ### Pre production stage ###
 ## is used to not bloat prod image
-## recomenned by Bret Fisher for avoiding put deleted unnecessary files in prod
+## recommened by Bret Fisher for avoiding put deleted unnecessary files in prod
 FROM test as pre-prod
+
+WORKDIR /var/www/html
+COPY --chown=www-data:www-data . .
+
+RUN npm run prod && npm cache clean --force
 
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
 RUN rm -rfv /var/www/html/tests \
+    && rm -rfv /var/www/node_modules \
     && rm -rfv /var/www/html/trivy_* \
     && rm -rfv /var/www/html/node_modules \
     && rm -rfv /var/www/html/resources/css \
@@ -226,7 +209,6 @@ RUN rm -rfv /var/www/html/tests \
     && rm -rfv /var/www/html/storage/framework/sessions/* \
     && rm -rfv /var/www/html/storage/framework/views/* \
     && rm -rfv /var/www/html/storage/framework/cache/data/* \
-
     && rm -rfv /var/www/html/storage/framework/testing/*
 
 
