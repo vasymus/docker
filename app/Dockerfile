@@ -160,9 +160,6 @@ RUN npm config list \
     # is better then `npm install` for production
     && npm ci || npm install
 
-WORKDIR /var/www/html
-COPY --chown=www-data:www-data ./package*.json ./webpack.mix.js ./
-
 
 
 ### test stage ###
@@ -181,15 +178,21 @@ RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
 
 
 
-### Pre production stage ###
+### Pre production stage 1 and 2 ###
 ## is used to not bloat prod image
 ## recommened by Bret Fisher for avoiding put deleted unnecessary files in prod
-FROM test as pre-prod
+FROM dependencies as pre-prod1
+
+WORKDIR /var/www/html
+COPY --chown=www-data:www-data ./webpack.mix.js ./
+COPY --chown=www-data:www-data ./resources/fonts ./resources/images ./resources/js ./resources/sass ./resources/
+RUN npm run prod && npm cache clean --force
+
+FROM dependencies as pre-prod2
 
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data . .
-
-RUN npm run prod && npm cache clean --force
+COPY --from=pre-prod1 --chown=www-data:www-data /var/www/html/public /var/www/html/public
 
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
@@ -225,7 +228,7 @@ ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 # we already have node_modules / tests / resources/(css|js) / storage in base
 # so we copy from pre-prod without those of 'test' stage
-COPY --from=pre-prod --chown=www-data:www-data /var/www/html /var/www/html
+COPY --from=pre-prod2 --chown=www-data:www-data /var/www/html /var/www/html
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
 HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
