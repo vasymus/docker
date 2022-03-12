@@ -183,16 +183,23 @@ RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
 ## recommened by Bret Fisher for avoiding put deleted unnecessary files in prod
 FROM dependencies as pre-prod1
 
-WORKDIR /var/www/html
+WORKDIR /var/www
 COPY --chown=www-data:www-data ./webpack.mix.js ./
-COPY --chown=www-data:www-data ./resources/fonts ./resources/images ./resources/js ./resources/sass ./resources/
-RUN npm run prod && npm cache clean --force
+COPY --chown=www-data:www-data ./public ./public
+# didn't find to copy in one COPY command without changing directory structure
+# https://stackoverflow.com/a/37715522
+COPY --chown=www-data:www-data ./resources/fonts ./resources/fonts
+COPY --chown=www-data:www-data ./resources/images ./resources/images
+COPY --chown=www-data:www-data ./resources/js ./resources/js
+COPY --chown=www-data:www-data ./resources/sass ./resources/sass
+
+RUN npm run prod
 
 FROM dependencies as pre-prod2
 
 WORKDIR /var/www/html
 COPY --chown=www-data:www-data . .
-COPY --from=pre-prod1 --chown=www-data:www-data /var/www/html/public /var/www/html/public
+COPY --from=pre-prod1 --chown=www-data:www-data /var/www/public /var/www/html/public
 
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
