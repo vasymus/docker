@@ -235,6 +235,8 @@ ENTRYPOINT ["docker-php-entrypoint-prod"]
 # we already have node_modules / tests / resources/(css|js) / storage in base
 # so we copy from pre-prod without those of 'test' stage
 COPY --from=pre-prod2 --chown=www-data:www-data /var/www/html /var/www/html
+WORKDIR /var/www/html
+RUN cp .env.example .env
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
 HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
