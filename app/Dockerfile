@@ -137,9 +137,9 @@ ENV APP_NAME="Parket Lux" \
     MAIL_FROM_NAME="${APP_NAME}"
 
 # env variables for composer and npm
-ENV COMPOSER_VENDOR_DIR="/var/www/vendor" \
-    PATH="/var/www/node_modules/.bin:$PATH" \
-    NODE_PATH=/var/www/node_modules
+#ENV COMPOSER_VENDOR_DIR="/var/www/vendor" \
+#    PATH="/var/www/node_modules/.bin:$PATH" \
+#    NODE_PATH=/var/www/node_modules
 
 WORKDIR /var/www/html
 
@@ -152,7 +152,6 @@ RUN composer install --no-scripts --no-autoloader --ansi --no-interaction --no-d
 ##
 ## Node Build Tools
 ##
-WORKDIR /var/www
 ENV NODE_ENV="development"
 COPY --chown=www-data:www-data ./package*.json ./
 COPY --chown=www-data:www-data ./resources/js/vendor ./resources/js/vendor
@@ -164,8 +163,6 @@ RUN npm config list \
 
 ### test stage ###
 FROM dependencies as test
-
-WORKDIR /var/www/html
 
 # https://docs.npmjs.com/cli/v7/commands/npm-audit
 # RUN npm audit
@@ -183,9 +180,7 @@ RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
 ## recommened by Bret Fisher for avoiding put deleted unnecessary files in prod
 FROM dependencies as pre-prod1
 
-WORKDIR /var/www
 COPY --chown=www-data:www-data ./webpack.mix.js ./
-COPY --chown=www-data:www-data ./public ./public
 # didn't find to copy in one COPY command without changing directory structure
 # https://stackoverflow.com/a/37715522
 COPY --chown=www-data:www-data ./resources/fonts ./resources/fonts
@@ -196,14 +191,13 @@ RUN npm run prod
 
 FROM dependencies as pre-prod2
 
-WORKDIR /var/www/html
 COPY --chown=www-data:www-data . .
-COPY --from=pre-prod1 --chown=www-data:www-data /var/www/public /var/www/html/public
+COPY --from=pre-prod1 --chown=www-data:www-data /var/www/html/public /var/www/html/public
 
 # delete unused in production files
 # node_modules / css / js and images are compiled to ./public
 RUN rm -rfv /var/www/html/tests \
-    && rm -rfv /var/www/node_modules \
+    && rm -rfv /var/www/html/node_modules \
     && rm -rfv /var/www/html/trivy_* \
     && rm -rfv /var/www/html/node_modules \
     && rm -rfv /var/www/html/resources/css \
@@ -233,7 +227,6 @@ RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
 # we already have node_modules / tests / resources/(css|js) / storage in base
 # so we copy from pre-prod without those of 'test' stage
 COPY --from=pre-prod2 --chown=www-data:www-data /var/www/html /var/www/html
-WORKDIR /var/www/html
 RUN cp .env.example .env
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
