@@ -17,6 +17,7 @@ ___docs
 /public/hot
 /public/storage
 /public/vendor
+/vendor
 # ignore everything from storage
 # except for storage/app/persistent and storage/app/public/persistent
 # should be adjusted for concrete project if need

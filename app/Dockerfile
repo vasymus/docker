@@ -230,8 +230,6 @@ COPY ./docker/app/docker-php-entrypoint-prod /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-prod
 
-ENTRYPOINT ["docker-php-entrypoint-prod"]
-
 # we already have node_modules / tests / resources/(css|js) / storage in base
 # so we copy from pre-prod without those of 'test' stage
 COPY --from=pre-prod2 --chown=www-data:www-data /var/www/html /var/www/html
@@ -239,10 +237,12 @@ WORKDIR /var/www/html
 RUN cp .env.example .env
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
-HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
+#HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
 
 # 80 - for nginx
 EXPOSE 80
+
+ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
 
