@@ -17,6 +17,11 @@ ___docs
 /public/hot
 /public/storage
 /public/vendor
+/public/_admin
+/public/css
+/public/fonts
+/public/images
+/public/js
 /vendor
 # ignore everything from storage
 # except for storage/app/persistent and storage/app/public/persistent
