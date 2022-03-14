@@ -237,11 +237,11 @@ RUN cp .env.example .env
 # 80 - for nginx
 EXPOSE 80
 
+RUN apt-get update && apt-get install -y sudo
+
 ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
-
-USER www-data
 
 
 # TODO think of adding base auth for $FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI pages
