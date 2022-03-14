@@ -148,8 +148,8 @@ WORKDIR /var/www/html
 ##
 COPY --chown=www-data:www-data ./composer.json ./composer.lock* ./
 # RUN composer config github-oauth.github.com YOUROAUTHKEYHERE
-# for some reason if you run on hosting with --no-dev flag doctrine is not install
-RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
+# for some reason if you run on hosting with flag doctrine is not install
+RUN composer install --no-scripts --no-autoloader --ansi --no-interaction --no-dev
 
 ##
 ## Node Build Tools
