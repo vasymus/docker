@@ -241,6 +241,8 @@ ENTRYPOINT ["docker-php-entrypoint-prod"]
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
 
+USER www-data
+
 
 # TODO think of adding base auth for $FPM_PING_URI $FPM_STATUS_URI $NGINX_STATUS_URI pages
 #RUN /bin/bash -c "htpasswd -bn default secret > /etc/nginx/conf.d/nginx.htpasswd"
