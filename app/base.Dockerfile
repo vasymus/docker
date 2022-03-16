@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     ca-certificates \
     dirmngr \
     xz-utils \
+    # for running some scripts as www-data inside container
+    sudo \
     && rm -r /var/lib/apt/lists/* \
     # install nginx (copied from official nginx Dockerfile)
     && NGINX_GPGKEY=573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62; \
@@ -120,7 +122,7 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
         | sort -u \
         | xargs -r apt-mark manual \
     # exclude packages from autoremove that are used @see https://askubuntu.com/a/943292
-    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base unzip curl \
+    && apt-mark manual dos2unix supervisor wget openssh-client ca-certificates nginx gettext-base unzip curl sudo \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
     # smoke tests

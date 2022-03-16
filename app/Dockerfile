@@ -95,53 +95,16 @@ COPY ./docker/app/docker-php-entrypoint-dev /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-dev \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-dev
 
-# for running some scripts as www-data inside container
-RUN apt-get update && apt-get install -y sudo
-
 
 
 ### dependencies stage ###
 # for running installing non-dev dependencies of composer and npm ###
 FROM base as dependencies
 
-# in laravel `env()` function take environemt variables from .env file or from OS global environment (global environment have priority over .env file)
-# in production we put all environments to OS global environment
-# in dev we assume that developer manually create .env file (based on .env.example)
-ENV APP_NAME="Parket Lux" \
-    APP_ENV="production" \
-    # temporary key for building only. Real key should be pass via docker secret or other hidden way
-    APP_KEY="base64:rLuN5t3YwZvIyOn+/I3AHD2nJbYIUcVXHq+PqJH5IZ8=" \
-    APP_DEBUG="false" \
-    APP_URL="http://localhost" \
-    # errors in docker should go to stdout (not in file, because the file could consume all space on disk)
-    LOG_CHANNEL="stderr" \
-    DB_CONNECTION="mysql" \
-    DB_HOST="db" \
-    DB_PORT=3306 \
-    DB_DATABASE="laravel" \
-    DB_USERNAME="default" \
-    DB_PASSWORD="secret" \
-    BROADCAST_DRIVER="log" \
-    CACHE_DRIVER="array" \
-    FILESYSTEM_DRIVER="local" \
-    QUEUE_CONNECTION="sync" \
-    SESSION_DRIVER="file" \
-    SESSION_LIFETIME=120 \
-    MAIL_MAILER="smtp" \
-    MAIL_HOST="mailhog" \
-    MAIL_PORT=1025 \
-    MAIL_USERNAME=null \
-    MAIL_PASSWORD=null \
-    MAIL_ENCRYPTION=null \
-    MAIL_FROM_ADDRESS=null \
-    MAIL_FROM_NAME="${APP_NAME}"
-
-# env variables for composer and npm
-#ENV COMPOSER_VENDOR_DIR="/var/www/vendor" \
-#    PATH="/var/www/node_modules/.bin:$PATH" \
-#    NODE_PATH=/var/www/node_modules
-
 WORKDIR /var/www/html
+
+# copy seeds separately for image cache
+COPY --chown=www-data:www-data ./storage ./storage
 
 ##
 ## Compose Package Manager
@@ -152,7 +115,7 @@ COPY --chown=www-data:www-data ./composer.json ./composer.lock* ./
 RUN composer install --no-scripts --no-autoloader --ansi --no-interaction
 
 ##
-## Node Build Tools
+## Npm Install And Node Build Tools (webpack)
 ##
 ENV NODE_ENV="development"
 COPY --chown=www-data:www-data ./package*.json ./
@@ -161,29 +124,8 @@ RUN npm config list \
     # is better then `npm install` for production
     && npm ci || npm install
 
-
-
-### test stage ###
-FROM dependencies as test
-
-# https://docs.npmjs.com/cli/v7/commands/npm-audit
-# RUN npm audit
-# TODO think of security checker @see https://github.com/FriendsOfPHP/security-advisories
-# TODO think of running `composer validate` or `composer outdated` or `composer diagnose`
-
-RUN wget https://github.com/aquasecurity/trivy/releases/download/v0.20.2/trivy_0.20.2_Linux-64bit.deb
-RUN dpkg -i trivy_0.20.2_Linux-64bit.deb \
-    && trivy filesystem --exit-code 0 --no-progress /
-
-
-
-### Pre production stage 1 and 2 ###
-## is used to not bloat prod image
-## recommened by Bret Fisher for avoiding put deleted unnecessary files in prod
-FROM dependencies as pre-prod1
-
 COPY --chown=www-data:www-data ./webpack.mix.js ./
-# didn't find to copy in one COPY command without changing directory structure
+# didn't find to copy (without resources/view folder) in one COPY command without changing directory structure
 # https://stackoverflow.com/a/37715522
 COPY --chown=www-data:www-data ./resources/fonts ./resources/fonts
 COPY --chown=www-data:www-data ./resources/images ./resources/images
@@ -191,45 +133,37 @@ COPY --chown=www-data:www-data ./resources/js ./resources/js
 COPY --chown=www-data:www-data ./resources/sass ./resources/sass
 RUN npm run prod
 
-FROM dependencies as pre-prod2
+##
+## Copy Other Files
+##
+# didn't find a way to copy ./ ./ without ./storage, which was copies earlier @see https://github.com/moby/moby/issues/15771
+COPY --chown=www-data:www-data ./bootstrap ./
+COPY --chown=www-data:www-data ./config ./
+COPY --chown=www-data:www-data ./database ./
+COPY --chown=www-data:www-data ./public ./
+COPY --chown=www-data:www-data ./resources/views ./resources/views
+COPY --chown=www-data:www-data ./routes ./
+COPY --chown=www-data:www-data ./src ./
+COPY --chown=www-data:www-data ["./artisan", "./server.php", "./"]
 
-COPY --chown=www-data:www-data . .
-COPY --from=pre-prod1 --chown=www-data:www-data /var/www/html/public /var/www/html/public
-
-# delete unused in production files
+##
+## Delete Files That Are Not Used In Production
+##
 # node_modules / css / js and images are compiled to ./public
 RUN rm -rfv /var/www/html/tests \
     && rm -rfv /var/www/html/node_modules \
-    && rm -rfv /var/www/html/trivy_* \
     && rm -rfv /var/www/html/node_modules \
     && rm -rfv /var/www/html/resources/css \
     && rm -rfv /var/www/html/resources/js \
     && rm -rfv /var/www/html/resources/images \
-    && rm -rfv /var/www/html/resources/fonts \
-    # todo think if we need to remove non-persistent data manually
-    && rm -rfv /var/www/html/bootstrap/cache/data/* \
-    && rm -rfv /var/www/html/storage/logs/* \
-    && rm -rfv /var/www/html/storage/media-library/temp/* \
-    && rm -rfv /var/www/html/storage/debugbar/* \
-    && rm -rfv /var/www/html/storage/framework/sessions/* \
-    && rm -rfv /var/www/html/storage/framework/views/* \
-    && rm -rfv /var/www/html/storage/framework/cache/data/* \
-    && rm -rfv /var/www/html/storage/framework/testing/*
+    && rm -rfv /var/www/html/resources/fonts
 
-
-
-### Prod stage ###
-FROM dependencies as prod
 
 ### copy entrypoint and overwrite default one of base php image ###
 COPY ./docker/app/docker-php-entrypoint-prod /usr/local/bin/
 RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
     && chmod 770 /usr/local/bin/docker-php-entrypoint-prod
 
-# we already have node_modules / tests / resources/(css|js) / storage in base
-# so we copy from pre-prod without those of 'test' stage
-COPY --from=pre-prod2 --chown=www-data:www-data /var/www/html /var/www/html
-RUN cp .env.example .env
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
 #HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
@@ -237,7 +171,6 @@ RUN cp .env.example .env
 # 80 - for nginx
 EXPOSE 80
 
-RUN apt-get update && apt-get install -y sudo
 
 ENTRYPOINT ["docker-php-entrypoint-prod"]
 
