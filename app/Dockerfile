@@ -137,14 +137,14 @@ RUN npm run prod
 ## Copy Other Files
 ##
 # didn't find a way to copy ./ ./ without ./storage, which was copies earlier @see https://github.com/moby/moby/issues/15771
-COPY --chown=www-data:www-data ./bootstrap ./
-COPY --chown=www-data:www-data ./config ./
-COPY --chown=www-data:www-data ./database ./
-COPY --chown=www-data:www-data ./public ./
-COPY --chown=www-data:www-data ./resources/views ./resources/views
-COPY --chown=www-data:www-data ./routes ./
-COPY --chown=www-data:www-data ./src ./
+COPY --chown=www-data:www-data ./bootstrap ./bootstrap
 COPY --chown=www-data:www-data ["./artisan", "./server.php", "./"]
+COPY --chown=www-data:www-data ./config ./config
+COPY --chown=www-data:www-data ./database ./database
+COPY --chown=www-data:www-data ./public ./public
+COPY --chown=www-data:www-data ./resources/views ./resources/views
+COPY --chown=www-data:www-data ./routes ./routes
+COPY --chown=www-data:www-data ./src ./src
 
 ##
 ## Delete Files That Are Not Used In Production
