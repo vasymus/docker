@@ -166,7 +166,7 @@ RUN dos2unix /usr/local/bin/docker-php-entrypoint-prod \
 
 
 # be sure nginx is properly passing to php-fpm and fpm is responding
-#HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "http://localhost$FPM_PING_URI" || exit 1
+#HEALTHCHECK --interval=5s --timeout=3s CMD curl -f "localhost$FPM_PING_URI" || exit 1
 
 # 80 - for nginx
 EXPOSE 80
