@@ -17,14 +17,12 @@ chmod -R g+w /var/www/html/storage/
 
 # put here any production bash scripts if need
 composer dump-autoload -o
-ls -al
-ls -al ./vendor
-sudo -u www-data php artisan migrate --seed --force
-sudo -u www-data php artisan clear-compiled
-sudo -u www-data php artisan config:clear
-sudo -u www-data php artisan cache:clear
-sudo -u www-data php artisan config:cache
-sudo -u www-data php artisan view:cache
-sudo -u www-data php artisan route:cache
+sudo -u www-data -E php artisan migrate --seed --force
+sudo -u www-data -E php artisan clear-compiled
+sudo -u www-data -E php artisan config:clear
+sudo -u www-data -E php artisan cache:clear
+sudo -u www-data -E php artisan config:cache
+sudo -u www-data -E php artisan view:cache
+sudo -u www-data -E php artisan route:cache
 
 exec "$@"
