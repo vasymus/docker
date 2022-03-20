@@ -17,6 +17,7 @@ chmod -R g+w /var/www/html/storage/
 
 # put here any production bash scripts if need
 composer dump-autoload -o
+sudo -u www-data -E php artisan storage:link
 sudo -u www-data -E php artisan migrate --seed --force
 sudo -u www-data -E php artisan clear-compiled
 sudo -u www-data -E php artisan config:clear
