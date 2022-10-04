@@ -125,6 +125,8 @@ RUN npm config list \
     && npm ci || npm install
 
 COPY --chown=www-data:www-data ./webpack.mix.js ./
+COPY --chown=www-data:www-data ./webpack.config.js ./
+COPY --chown=www-data:www-data ./webpack.ssr.mix.js ./
 # didn't find to copy (without resources/view folder) in one COPY command without changing directory structure
 # https://stackoverflow.com/a/37715522
 COPY --chown=www-data:www-data ./resources/fonts ./resources/fonts
