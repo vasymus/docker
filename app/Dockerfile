@@ -134,6 +134,7 @@ COPY --chown=www-data:www-data ./resources/fonts ./resources/fonts
 COPY --chown=www-data:www-data ./resources/images ./resources/images
 COPY --chown=www-data:www-data ./resources/js ./resources/js
 COPY --chown=www-data:www-data ./resources/sass ./resources/sass
+RUN composer ziggy-routes
 RUN npm run prod
 
 ##
