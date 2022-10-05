@@ -138,7 +138,7 @@ COPY --chown=www-data:www-data ./resources/sass ./resources/sass
 ##
 ## Copy Other Files
 ##
-# didn't find a way to copy ./ ./ without ./storage, which was copies earlier @see https://github.com/moby/moby/issues/15771
+# didn't find a way to copy ./ ./ without ./storage, which was copied earlier @see https://github.com/moby/moby/issues/15771
 COPY --chown=www-data:www-data ["./artisan", "./server.php", "./"]
 COPY --chown=www-data:www-data ./bootstrap ./bootstrap
 COPY --chown=www-data:www-data ./config ./config
@@ -151,6 +151,7 @@ COPY --chown=www-data:www-data ./src ./src
 ##
 ## Run build of ziggy routes and frontend scaffolding
 ##
+RUN composer dump-autoload -o
 RUN composer ziggy-routes
 RUN npm run prod
 
