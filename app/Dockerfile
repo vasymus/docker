@@ -152,6 +152,7 @@ COPY --chown=www-data:www-data ./src ./src
 ## Run build of ziggy routes and frontend scaffolding
 ##
 RUN composer dump-autoload -o
+ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN composer ziggy-routes
 RUN npm run prod
 
