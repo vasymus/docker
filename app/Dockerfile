@@ -147,6 +147,7 @@ COPY --chown=www-data:www-data ./public ./public
 COPY --chown=www-data:www-data ./resources/views ./resources/views
 COPY --chown=www-data:www-data ./routes ./routes
 COPY --chown=www-data:www-data ./src ./src
+COPY --chown=www-data:www-data ./lang ./lang
 
 ##
 ## Run build of ziggy routes and frontend scaffolding
