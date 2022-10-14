@@ -1,7 +1,7 @@
 # vasymus/base-php-nginx-node:php-8.0.12-nginx-1.20.1-node-14.18.1
 # vasymus/base-php-nginx-node:php-7.4.27-nginx-1.20.1-node-14.18.1
 # vasymus/base-php-nginx-node:php-8.0.15-nginx-1.20.1-node-16.13.2
-FROM php:8.0.15-fpm-buster as prepare
+FROM php:8.1.11-fpm-buster as prepare
 
 ### PREPARATION PART of image ###
 # should make any changes to it as less as possible
@@ -130,6 +130,6 @@ RUN apt-get update && apt-get install --no-install-recommends --no-install-sugge
     && npm --version
 
 # install composer from official image @see https://hub.docker.com/_/composer
-COPY --from=composer:2.2.5 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.4.2 /usr/bin/composer /usr/bin/composer
 
 ### / PREPARATION PART of image ###
