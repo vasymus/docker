@@ -165,8 +165,7 @@ RUN npm run prod
 # node_modules / css / js and images are compiled to ./public
 RUN rm -rfv /var/www/html/tests \
     && rm -rfv /var/www/html/node_modules \
-    && rm -rfv /var/www/html/node_modules \
-    && rm -rfv /var/www/html/resources/css \
+    && rm -rfv /var/www/html/resources/sass \
     && rm -rfv /var/www/html/resources/js \
     && rm -rfv /var/www/html/resources/images \
     && rm -rfv /var/www/html/resources/fonts
